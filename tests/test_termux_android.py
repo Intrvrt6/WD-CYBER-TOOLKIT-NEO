@@ -258,3 +258,48 @@ def test_changelog_has_an_entry_for_the_running_version():
     changelog = (ROOT / "CHANGELOG.md").read_text()
     assert f"## {config.APP_VERSION}" in changelog, (
         f"APP_VERSION is {config.APP_VERSION} but CHANGELOG.md has no '## {config.APP_VERSION}' section")
+
+
+# ------------------------------------------- advertised port must be real -- #
+def test_serving_port_prefers_the_host_header_port():
+    """Behind a reverse proxy the socket port is not the client-facing one."""
+    assert P.serving_port(8000, {"host": "phone.test:9443"}) == 9443
+
+
+def test_serving_port_falls_back_to_the_socket_port():
+    """No port in `Host` (e.g. a TestClient default) -> use the live socket."""
+    assert P.serving_port(9187, {"host": "testserver"}) == 9187
+
+
+def test_serving_port_parses_ipv6_and_ignores_bare_hostnames():
+    assert P.serving_port(None, {"host": "[::1]:8081"}) == 8081
+    # A bare hostname carries no port; do not invent one from the hostname.
+    assert P.serving_port(None, {"host": "phone.local"}) == P.DEFAULT_PORT
+
+
+def test_serving_port_never_trusts_a_userinfo_prefix():
+    # `user:pass@host` must not be read as "port pass".
+    assert P._port_from_authority("a:9999@evil:1") == 1
+    assert P._port_from_authority("a:b@evil") is None
+
+
+def test_network_info_port_argument_is_honoured():
+    """The reported bug: a console on :9187 advertised :8000."""
+    info = P.network_info(9187)
+    assert info["port"] == 9187, "network_info must report the port it was told to"
+    assert info["on_device_url"] == "http://127.0.0.1:9187"
+    assert all(u.endswith(":9187") for u in info["urls"])
+
+
+def test_api_network_reports_the_port_the_request_arrived_on(client):
+    """End-to-end guard on the endpoint the APK's DETECT calls.
+
+    The original test only asserted the `http://127.0.0.1:` prefix, so it passed
+    while the endpoint advertised :8000 no matter which port served the request.
+    Assert the completed URL, including the port.
+    """
+    r = client.get("/api/network", headers={"host": "phone.test:9443"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["port"] == 9443
+    assert body["on_device_url"] == "http://127.0.0.1:9443"

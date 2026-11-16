@@ -27,6 +27,7 @@ import re
 import shutil
 import socket
 import struct
+from collections.abc import Mapping
 from typing import Any
 
 from backend import runner
@@ -377,14 +378,67 @@ def primary_lan_ip() -> str | None:
     return None
 
 
-def lan_urls(port: int | None = None, scheme: str = "http") -> list[str]:
+DEFAULT_PORT = 8000
+
+
+def _port_from_authority(authority: str | None) -> int | None:
+    """The explicit port in an HTTP `authority`, or None when there is none.
+
+    Handles `host:8080`, `[::1]:8000` and bare `host`. A bare hostname carries no
+    port, so the caller must fall through to another source -- this function
+    never invents one.
+    """
+    if not authority:
+        return None
+    authority = authority.rsplit("@", 1)[-1].strip()
+    if authority.startswith("["):  # IPv6 literal
+        _, _, tail = authority.partition("]")
+        return int(tail[1:]) if tail.startswith(":") and tail[1:].isdigit() else None
+    if authority.count(":") == 1:
+        _, _, port = authority.partition(":")
+        return int(port) if port.isdigit() else None
+    return None
+
+
+def serving_port(request_port: int | None = None,
+                 headers: Mapping[str, str] | None = None) -> int:
+    """The port this console is *actually* served on, in trust order.
+
+    1. the `Host` header's explicit port -- what the client really dialled. On a
+       direct connection this equals the socket port; behind a reverse proxy it
+       is the client-facing port, which the socket port would get wrong.
+    2. `request_port` -- the socket the request in flight arrived on.
+    3. `WD_PORT` -- what `run.sh` / `termux.sh` export before exec'ing uvicorn.
+    4. `DEFAULT_PORT`.
+
+    This exists because the first version read only `WD_PORT`: a console started
+    with `uvicorn --port 9187` and no exported `WD_PORT` advertised `:8000`, so a
+    client -- and the APK's DETECT -- dialled a port nothing listens on. The
+    advertised value has to be the one that answers.
+
+    Only the *port* is taken from `Host`, never the hostname; the advertised
+    host stays loopback/LAN. So a spoofed `Host` can at most misstate the port of
+    this same console in an advisory, unauthenticated payload.
+    """
+    from_host = _port_from_authority((headers or {}).get("host"))
+    if from_host:
+        return int(from_host)
+    if request_port:
+        return int(request_port)
+    env = os.environ.get("WD_PORT", "").strip()
+    if env.isdigit():
+        return int(env)
+    return DEFAULT_PORT
+
+
+def lan_urls(port: int | None = None, scheme: str = "http",
+             headers: Mapping[str, str] | None = None) -> list[str]:
     """Every URL a client could use to reach this console.
 
     Loopback comes first because an on-device client (the APK next to a Termux
     console) must use 127.0.0.1, not the phone's LAN address.
     """
-    from backend import config
-    p = port or int(os.environ.get("WD_PORT", "8000"))
+    p = serving_port(port, headers)
     urls = [f"{scheme}://127.0.0.1:{p}"]
     lan = primary_lan_ip()
     if lan:
@@ -394,10 +448,14 @@ def lan_urls(port: int | None = None, scheme: str = "http") -> list[str]:
     return urls
 
 
-def network_info(port: int | None = None) -> dict[str, Any]:
-    """Payload for GET /api/network — lets a client discover the console URL."""
+def network_info(port: int | None = None,
+                 headers: Mapping[str, str] | None = None) -> dict[str, Any]:
+    """Payload for GET /api/network — lets a client discover the console URL.
+
+    `port` should be the port the request arrived on; see `serving_port`.
+    """
     from backend import config
-    p = port or int(os.environ.get("WD_PORT", "8000"))
+    p = serving_port(port, headers)
     urls = lan_urls(p)
     return {
         "platform": platform_label(),

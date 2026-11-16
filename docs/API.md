@@ -12,7 +12,7 @@ Interactive schema: `/api/docs` · OpenAPI: `/api/openapi.json`
 |---|---|---|
 | GET | `/api/health` | status, version, engine registry status, emergency-stop state |
 | GET | `/api/capabilities` | detected CLI tools + Python modules, host, interfaces, CAN, USB, raw-socket, platform |
-| GET | `/api/network` | **unauthenticated** discovery: platform, port, bind host, `on_device_url` (loopback), `lan_url`, all candidate `urls`, interface source. Addressing facts only — no scope, findings or secrets |
+| GET | `/api/network` | **unauthenticated** discovery: platform, port, bind host, `on_device_url` (loopback), `lan_url`, all candidate `urls`, interface source. `port` is the port the request actually arrived on (`Host`, else socket, else `WD_PORT`, else 8000), so the advertised URL is one that answers. Addressing facts only — no scope, findings or secrets |
 | GET | `/api/version` | instance/version/python |
 
 ## Authentication

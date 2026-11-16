@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session as OrmSession
@@ -37,16 +37,21 @@ def caps():
 
 
 @router.get("/network")
-def network():
+def network(request: Request):
     """Discovery endpoint: how a client should reach this console.
 
     Deliberately unauthenticated. The Android client has to learn the server URL
     *before* it can log in, and on a phone the correct answer is usually
     127.0.0.1 (the console runs in Termux on the same device). Exposes only
     addressing facts -- no secrets, no scope, no findings.
+
+    The advertised port is read from the request in flight (see
+    `platform_utils.serving_port`), so it is the port that actually answers. A
+    console on a non-default port must not advertise 8000.
     """
     from backend import platform_utils
-    return platform_utils.network_info()
+    socket_port = request.url.port
+    return platform_utils.network_info(socket_port, dict(request.headers))
 
 
 @router.get("/modules")

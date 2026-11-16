@@ -120,7 +120,7 @@ per-engine dump; the pytest module is what CI enforces.
 ```
 engines registered : 10 / 10          check ids declared : 78 (all unique)
 engine import errors: 0
-full test suite    : 197 passed  (at 1.3.0; 227 at 1.4.0)
+full test suite    : 197 passed  (at 1.3.0; 227 at 1.4.0, 233 at 1.4.1)
 E2E over real HTTP : 10 / 10 templates PASS
 report sections    : 12 / 12 in English and Indonesian
 ```

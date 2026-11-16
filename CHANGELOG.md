@@ -3,6 +3,46 @@
 All notable changes to WD CYBER TOOLKIT NEO. Versions follow the application's own
 `APP_VERSION` in `backend/config.py`.
 
+## 1.4.1 — 2026-11-16
+
+Patch release fixing one defect in the 1.4.0 discovery endpoint: it advertised the wrong port.
+
+### Fixed
+
+- **`GET /api/network` always reported port 8000**, whatever port the console was actually served
+  on. The payload read only `WD_PORT`, which is exported by `run.sh` and `termux.sh` but is absent
+  from the environment `uvicorn --port <n>` is commonly started with. A console on `:9187` therefore
+  told clients `on_device_url: http://127.0.0.1:8000`, and the APK's DETECT would dial a port with
+  nothing behind it — the same class of bug this release was meant to remove (the client had been
+  guessing `10.0.2.2`). Observed before the fix on a live instance on `:9455`: `"port": 8000`,
+  `"on_device_url": "http://127.0.0.1:8000"`.
+
+  The advertised port is now resolved by `platform_utils.serving_port()` in trust order: the `Host`
+  header's explicit port (what the client really dialled, and correct behind a reverse proxy) →
+  the socket port the request arrived on → `WD_PORT` → the documented default. `GET /api/network`
+  passes the live request's port and headers, so the advertised URL is the one that answers. Only
+  the *port* is taken from `Host`; the advertised host stays loopback/LAN, so a spoofed `Host` can
+  at most misstate the port of this same console in an advisory, unauthenticated payload.
+
+- **The test that covered this did not assert the port.** It checked only that `on_device_url`
+  started with `http://127.0.0.1:`, which is why it passed on `:9187` while the payload said 8000.
+  Six tests now assert the completed URL, including IPv6 authorities, bare hostnames and the
+  `user:pass@host` case; all six fail against the 1.4.0 code.
+
+### Tests
+
+- Full suite: **233 passed** — 227 at 1.4.0 plus the six new port tests.
+- `python3 tests/audit_all_engines.py` — **0 / 10 engines with problems**.
+- `python3 scripts/termux_proof.py` — **30 passed, 0 failed**.
+- `android/run_harness.sh` — **30 / 30 checks**.
+
+### Known limits
+
+- The port now reported is correct for a direct connection and for a proxy that forwards the client's
+  `Host`. A proxy that rewrites `Host` to the upstream address without setting `X-Forwarded-Host`
+  will still cause the socket port to be reported; that is the safe direction (a real port) rather
+  than an invented one.
+
 ## 1.4.0 — 2026-11-16
 
 Android access release. The platform now runs *on the phone* under Termux, and the APK knows how to
