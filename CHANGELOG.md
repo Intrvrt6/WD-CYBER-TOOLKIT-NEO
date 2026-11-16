@@ -39,7 +39,7 @@ at `1.2.0`; each is covered by `tests/test_review_second_pass.py` and re-proved 
 
 - `APP_VERSION` is `1.2.1`; `docs/SECURITY.md` documents semantic scope matching, the audit anchor
   and its limits, the viewer role's actual capability, and session revocation on credential change.
-- Test suite is 151 tests.
+- Test suite: 186 collected tests (168 test functions, parametrised).
 
 ## 1.2.0 — 2026-11-16
 
