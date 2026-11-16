@@ -645,6 +645,11 @@
   $('#pin-form').addEventListener('submit', async (ev) => {
     ev.preventDefault();
     const msg = $('#pin-msg');
+    if (!S.me || S.me.stage < 2) {
+      msg.textContent = 'Unlock stage 2 first: rotating the PIN needs a stage-2 session.';
+      msg.className = 'gate-msg err';
+      return;
+    }
     try {
       await WD.changePin($('#pin-pass').value, $('#pin-new').value);
       $('#pin-pass').value = $('#pin-new').value = '';

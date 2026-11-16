@@ -931,8 +931,7 @@ class CANEngine:
                                       asset=state.get("channel") or ""))
             return
         session = state["session"]
-        frames = state["frames"]
-        analysis = state["analysis"]
+        analysis = state["analysis"]  # frames comes from the enclosing capture scope
         # decide from measurement: static payload + no counter/checksum == replay friendly
         decisions = []
         for aid in sorted(state["ids"]):

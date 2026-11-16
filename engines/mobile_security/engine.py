@@ -803,11 +803,12 @@ def parse_axml(data: bytes) -> dict:
             n = (csize - chsize) // 4
             res_map = [_u32(data, off + chsize + 4 * i) for i in range(n)]
         elif ctype == RES_XML_START_ELEMENT and pool is not None:
-            ns = _u32(data, off + chsize)
+            ns_idx = _u32(data, off + chsize)
             name_idx = _u32(data, off + chsize + 4)
             attr_start = _u16(data, off + chsize + 8)
             attr_count = _u16(data, off + chsize + 12)
             attrs: dict[str, Any] = {}
+            _ = ns_idx  # namespace index; resolved lazily from the string pool
             for i in range(attr_count):
                 a = off + chsize + attr_start + i * 20
                 a_ns = _u32(data, a)

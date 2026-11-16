@@ -5,6 +5,7 @@ import logging
 import os
 import sys
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -91,17 +92,47 @@ def version():
 if config.FRONTEND_DIR.exists():
     app.mount("/assets", StaticFiles(directory=str(config.FRONTEND_DIR / "assets")), name="assets")
 
+    _FRONTEND_ROOT = config.FRONTEND_DIR.resolve()
+    _SERVABLE = {".html", ".js", ".css", ".svg", ".ico", ".png", ".webmanifest",
+                 ".json", ".map", ".woff", ".woff2", ".ttf"}
+
+    def _safe_static(path: str) -> Path | None:
+        """Resolve `path` under frontend/ or return None.
+
+        The SPA catch-all used to compute ``FRONTEND_DIR / path`` and serve the
+        result whenever it was a file. ``path`` is attacker-controlled and FastAPI
+        passes the percent-decoded remainder, so ``..%2f..%2fdatabase%2f...``
+        escaped the frontend directory: an unauthenticated GET could read any file
+        the process can read, including database/bootstrap_credentials.txt with the
+        operator password, stage-2 PIN and WD shortcut in cleartext. Containment is
+        checked on the *resolved* path so symlinks cannot escape either.
+        """
+        if not path or path.startswith(("/", chr(92))) or chr(0) in path:
+            return None
+        try:
+            candidate = (config.FRONTEND_DIR / path).resolve()
+        except (OSError, ValueError):
+            return None
+        try:
+            candidate.relative_to(_FRONTEND_ROOT)
+        except ValueError:
+            return None
+        return candidate if candidate.is_file() else None
+
     @app.get("/")
     def index():
         return FileResponse(str(config.FRONTEND_DIR / "index.html"))
 
     @app.get("/{path:path}")
     def spa(path: str):
-        candidate = config.FRONTEND_DIR / path
-        if candidate.is_file():
-            return FileResponse(str(candidate))
+        hit = _safe_static(path)
         if path.startswith("api/"):
-            return JSONResponse(status_code=404, content={"detail": "not found"})
+            if hit is None:
+                return JSONResponse(status_code=404, content={"detail": "not found"})
+            return FileResponse(str(hit))
+        if hit is not None and hit.suffix in _SERVABLE:
+            return FileResponse(str(hit))
+        # Any other route (or an attempt to leave frontend/) renders the SPA.
         return FileResponse(str(config.FRONTEND_DIR / "index.html"))
 
 

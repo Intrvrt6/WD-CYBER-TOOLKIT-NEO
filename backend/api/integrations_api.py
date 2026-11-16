@@ -6,9 +6,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session as OrmSession
 
-from backend import audit
+from backend import audit, authorization, emergency_stop
 from backend.database import get_db
-from backend.deps import Principal, current_principal
+from backend.deps import Principal, current_principal, require_stage2_fresh_password
 from backend.integrations import catalog, status
 from backend.integrations import katana, ksubdomain, nuclei, remote
 
@@ -48,10 +48,27 @@ class CrawlIn(BaseModel):
     headless: bool = False
 
 
+def _require_in_scope(db, targets: list[str]) -> None:
+    """Every active integration call is an active test: enforce scope + stop state.
+
+    These routes used to run katana/nuclei/ksubdomain for any logged-in (even
+    stage-1) caller against any URL, bypassing the two-stage gate, the scope
+    registry and the emergency stop.
+    """
+    emergency_stop.require_clear(db)
+    check = authorization.validate_targets(db, targets)
+    bad = [r["target"] for r in check["results"] if not r["in_scope"]]
+    if bad:
+        raise HTTPException(status_code=403, detail={
+            "code": "OUT_OF_SCOPE",
+            "message": "Targets outside the registered scope: " + ", ".join(bad)})
+
+
 @router.post("/katana/crawl")
-def katana_crawl(body: CrawlIn, p: Principal = Depends(current_principal),
+def katana_crawl(body: CrawlIn, p: Principal = Depends(require_stage2_fresh_password),
                  db: OrmSession = Depends(get_db)):
     """Run a real katana crawl. Keep -jsl off unless headless is requested (memory)."""
+    _require_in_scope(db, [body.url])
     out = katana.crawl(body.url, depth=body.depth, duration_s=body.duration_s,
                        concurrency=body.concurrency, js_crawl=body.js_crawl,
                        headless=body.headless)
@@ -78,9 +95,10 @@ class NucleiIn(BaseModel):
 
 
 @router.post("/nuclei/sqli")
-def nuclei_sqli(body: NucleiIn, p: Principal = Depends(current_principal),
+def nuclei_sqli(body: NucleiIn, p: Principal = Depends(require_stage2_fresh_password),
                 db: OrmSession = Depends(get_db)):
     """Run the vendored SQLi templates. -dast is mandatory (fuzzing templates)."""
+    _require_in_scope(db, [body.url])
     out = nuclei.run_sqli(body.url, use_workflow=body.use_workflow, timeout_s=body.timeout_s)
     audit.record("integration.nuclei.sqli", actor=p.username, target=body.url,
                  detail={"count": out.get("count"), "available": out.get("available"),
@@ -99,8 +117,9 @@ class KsubIn(BaseModel):
 
 
 @router.post("/ksubdomain/enum")
-def ksubdomain_enum(body: KsubIn, p: Principal = Depends(current_principal),
+def ksubdomain_enum(body: KsubIn, p: Principal = Depends(require_stage2_fresh_password),
                     db: OrmSession = Depends(get_db)):
+    _require_in_scope(db, [body.domain])
     out = ksubdomain.enum(body.domain, dict_path=body.dict_path,
                           duration_s=body.duration_s, bandwidth=body.bandwidth)
     audit.record("integration.ksubdomain.enum", actor=p.username, target=body.domain,

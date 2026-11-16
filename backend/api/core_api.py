@@ -190,13 +190,17 @@ def run_assessment(assessment_id: str, body: RunIn, p: Principal = Depends(requi
         raise HTTPException(status_code=404, detail="assessment not found")
     if not body.confirm:
         raise HTTPException(status_code=400, detail="explicit confirmation required")
+    if a.operator != p.username and p.role != "admin":
+        raise HTTPException(status_code=403, detail={
+            "code": "ASSESSMENT_FOREIGN",
+            "message": "Assessment belongs to operator '" + a.operator + "'."})
     existing = db.execute(select(orchestrator.Job).where(
         orchestrator.Job.assessment_id == assessment_id,
         orchestrator.Job.status.in_(("queued", "running")))).scalars().first()
     if existing is not None:
         raise HTTPException(status_code=409, detail=f"assessment already running (job {existing.id})")
     try:
-        return orchestrator.start_job(db, a, body.authz_id, p.username)
+        return orchestrator.start_job(db, a, body.authz_id, p.username, user=p.user)
     except authorization.ScopeError as exc:
         raise HTTPException(status_code=exc.status, detail={"code": exc.code, "message": exc.message})
 

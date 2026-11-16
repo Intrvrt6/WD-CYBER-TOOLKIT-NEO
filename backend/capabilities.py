@@ -70,7 +70,10 @@ def python_modules() -> dict[str, dict]:
         try:
             m = importlib.import_module(mod)
             out[mod] = {"present": True, "package": pkg,
-                        "version": str(getattr(m, "__version__", None) or _meta_version(pkg) or "unknown")}
+                        # Prefer installed-distribution metadata: several packages
+                        # (argon2-cffi, PyJWT) deprecate or omit module.__version__.
+                        "version": str(_meta_version(pkg)
+                                       or getattr(m, "__version__", None) or "unknown")}
         except Exception as exc:
             out[mod] = {"present": False, "package": pkg, "error": f"{type(exc).__name__}: {exc}"}
     return out

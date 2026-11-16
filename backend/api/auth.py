@@ -95,8 +95,14 @@ def change_password(body: PasswordIn, p: Principal = Depends(current_principal),
 
 
 @router.post("/pin")
-def change_pin(body: PinIn, p: Principal = Depends(current_principal),
+def change_pin(body: PinIn, p: Principal = Depends(require_stage2),
                db: OrmSession = Depends(get_db)):
+    """Rotate the stage-2 PIN. Requires a stage-2 session.
+
+    This used to accept any authenticated session plus the stage-1 password, so
+    a stage-1-only holder could set a PIN of their choosing and then immediately
+    satisfy stage 2 themselves - the second factor was self-serviceable.
+    """
     try:
         return authentication.change_pin(db, p.user, body.password, body.new_pin)
     except AuthError as exc:

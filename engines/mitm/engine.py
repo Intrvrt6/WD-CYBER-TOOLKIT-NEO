@@ -101,7 +101,6 @@ class MITMEngine:
             return
         rows = []
         for host, port in hosts:
-            minimum = highest = None
             supported = []
             for proto_name, proto in (("TLSv1", ssl.TLSVersion.TLSv1), ("TLSv1.1", ssl.TLSVersion.TLSv1_1),
                                       ("TLSv1.2", ssl.TLSVersion.TLSv1_2), ("TLSv1.3", ssl.TLSVersion.TLSv1_3)):
@@ -112,7 +111,7 @@ class MITMEngine:
                     c.minimum_version = proto
                     c.maximum_version = proto
                     with socket.create_connection((host, port), timeout=5) as s:
-                        with c.wrap_socket(s, server_hostname=host) as ss:
+                        with c.wrap_socket(s, server_hostname=host):
                             supported.append(proto_name)
                 except (ssl.SSLError, OSError):
                     continue

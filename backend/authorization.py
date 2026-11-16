@@ -134,7 +134,15 @@ def create_authorization(db, user: User, sess: Session, targets: list[str],
     return authz
 
 
-def assert_valid(db, authz_id: str | None, targets: list[str]) -> Authorization:
+def assert_valid(db, authz_id: str | None, targets: list[str],
+                 user_id: str | None = None) -> Authorization:
+    """Validate an authorization for the stated targets.
+
+    ``user_id`` is the operator about to run the test. When supplied, the
+    authorization must have been granted to that operator: previously any
+    authenticated operator could spend somebody else's authorization, so the
+    audit trail attributed a run to whoever held the id.
+    """
     if not authz_id:
         raise ScopeError("An explicit authorization is required to run a test.",
                          "NO_AUTHZ", 403)
@@ -143,6 +151,9 @@ def assert_valid(db, authz_id: str | None, targets: list[str]) -> Authorization:
         raise ScopeError("Authorization not found or unconfirmed.", "BAD_AUTHZ", 403)
     if authz.revoked:
         raise ScopeError("Authorization revoked.", "AUTHZ_REVOKED", 403)
+    if user_id is not None and authz.user_id != user_id:
+        raise ScopeError("This authorization was granted to a different operator.",
+                         "AUTHZ_FOREIGN", 403)
     if (_norm(authz.expires_at) or utcnow()) < utcnow():
         raise ScopeError("Authorization expired.", "AUTHZ_EXPIRED", 403)
     check = validate_targets(db, targets)

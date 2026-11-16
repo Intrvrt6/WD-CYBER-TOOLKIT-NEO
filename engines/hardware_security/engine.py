@@ -131,7 +131,7 @@ class HardwareEngine:
         present = {"pci_sysfs": bool(pci), "lspci": bool(lspci_out), "input_sysfs": bool(inputs),
                    "block_sysfs": bool(disks), "net_sysfs": bool(nics)}
         missing = [k for k, v in present.items() if not v]
-        desc = (f"Peripheral sources that yielded data: "
+        desc = ("Peripheral sources that yielded data: "
                 + (", ".join(f"{k}={len(v)}" for k, v in (("pci", pci), ("input", inputs),
                                                           ("block", disks), ("net", nics))) or "none")
                 + (f". Sources with no data on this host: {', '.join(missing)}." if missing else "."))
@@ -277,7 +277,7 @@ class HardwareEngine:
                     "type": "locally-administered-mac", "iface": nic["name"], "mac": mac,
                     "addr_assign_type": assign, "detail":
                         f"{nic['name']} uses the locally-administered MAC {mac}"
-                        + (f" while addr_assign_type=0 reports it as permanent" if permanent
+                        + (" while addr_assign_type=0 reports it as permanent" if permanent
                            else f" (addr_assign_type={assign}: 1=random, 2=stolen, 3=set)")
                         + "; verify against the physical NIC inventory - veth/bridge interfaces normally "
                           "carry a locally-administered address",
@@ -658,7 +658,7 @@ def firmware_fingerprint() -> dict[str, str]:
     candidates += sorted(glob.glob("/boot/vmlinuz*"))[:4] + sorted(glob.glob("/boot/config-*"))[:4]
     seen = set()
     for path in candidates:
-        if path in seen or len(file_list := files) >= HASH_MAX_FILES:
+        if path in seen or len(files) >= HASH_MAX_FILES:
             continue
         seen.add(path)
         try:

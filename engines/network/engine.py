@@ -168,7 +168,6 @@ class NetworkEngine:
             ctx.add(unavailable("NET-03", "DNS resolution and record harvest",
                                 "No DNS names in the target set (IP/CIDR-only assessment)."))
             return
-        txt = "\n".join("; ".join(v) for r in records.values() for v in [sum(r.values(), [])])
         risky = []
         for host, r in records.items():
             joined = " ".join(str(x) for x in sum((v for v in r.values() if isinstance(v, list)), []))

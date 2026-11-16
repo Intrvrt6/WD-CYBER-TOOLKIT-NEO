@@ -33,7 +33,7 @@ Interactive schema: `/api/docs` · OpenAPI: `/api/openapi.json`
 | GET | `/api/auth/me` | user, stage, session expiry, emergency-stop state |
 | POST | `/api/auth/logout` | revokes the current session |
 | POST | `/api/auth/password` | `{old_password,new_password}` — 12+ chars, 3+ classes |
-| POST | `/api/auth/pin` | `{password,new_pin}` — 6+ digits |
+| POST | `/api/auth/pin` | `{password,new_pin}` — 6+ digits; **requires an already-stage-2 session** |
 | GET | `/api/auth/operators` | admin only |
 | POST | `/api/auth/operators` | admin only — `{username,password,pin,role}` |
 | POST | `/api/auth/shortcuts?label=` | admin only — issues a new WD shortcut, returned once |
@@ -121,8 +121,8 @@ Interactive schema: `/api/docs` · OpenAPI: `/api/openapi.json`
 | 200 | success |
 | 400 | invalid input |
 | 401 | missing/invalid session or credentials |
-| 403 | stage 2 required, out of scope, authorization invalid/expired/revoked |
+| 403 | stage 2 required, out of scope, authorization invalid/expired/revoked/granted to another operator (`AUTHZ_FOREIGN`), or assessment owned by another operator |
 | 404 | unknown assessment/template/job/artifact |
 | 409 | assessment already running, duplicate operator |
-| 423 | emergency stop active, or account locked |
+| 423 | emergency stop active, account locked, or stage-2 PIN ceiling reached (`PIN_ATTEMPTS_EXCEEDED`) |
 | 429 | rate limited |

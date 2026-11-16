@@ -17,6 +17,11 @@ from backend.database import Session, Shortcut, User, kv_get, kv_set, utcnow
 
 RATE_KEY = "login_attempts"
 
+# Stage-2 attempt ceiling: a 6-8 digit PIN is only 10^6-10^8 and, unlike the
+# password, was previously not rate limited at all, so a stage-1 holder could
+# simply iterate the PIN space on one session.
+STAGE2_MAX_ATTEMPTS = int(os.environ.get("WD_STAGE2_MAX_ATTEMPTS", "5"))
+
 
 def _naive_safe(value):
     """SQLite returns naive datetimes; treat them as UTC for comparison."""
@@ -109,25 +114,47 @@ def bootstrap(db) -> dict[str, Any] | None:
 
 
 # ------------------------------------------------------------- rate limiting --
-def _throttle(db, key: str) -> None:
+def _throttle(db, key: str, limit: int | None = None) -> None:
+    """Sliding-window throttle, counted per key.
+
+    The counter used to be one global row, so ten failed logins from any single
+    source blocked *every* operator from authenticating: a trivial login DoS.
+    Each key (client IP, and username) now keeps its own window, and the map is
+    bounded so hostile key churn cannot grow state without limit.
+    """
     now = utcnow()
     state = kv_get(db, RATE_KEY, {}) or {}
-    window_start = state.get("window_start")
-    hits = int(state.get("hits", 0))
+    windows = state.get("windows")
+    if not isinstance(windows, dict):
+        windows = {}  # tolerate the legacy single-window payload
+    entry = windows.get(key) or {}
+    window_start = entry.get("window_start")
+    hits = int(entry.get("hits", 0))
     if window_start is None or (now - dt.datetime.fromisoformat(window_start)).total_seconds() > config.RATE_LIMIT_WINDOW_SECONDS:
-        state = {"window_start": now.isoformat(), "hits": 0}
-        hits = 0
-    if hits >= config.RATE_LIMIT_ATTEMPTS:
-        raise AuthError("Too many authentication attempts, slow down.", "RATE_LIMITED", 429)
-    state["hits"] = hits + 1
-    state["key"] = key
-    kv_set(db, RATE_KEY, state)
+        window_start, hits = now.isoformat(), 0
+    allowed = config.RATE_LIMIT_ATTEMPTS if limit is None else limit
+    if hits >= allowed:
+        raise AuthError("Too many authentication attempts for this identity, slow down.",
+                        "RATE_LIMITED", 429)
+    windows[key] = {"window_start": window_start, "hits": hits + 1}
+    if len(windows) > 2048:
+        newest = sorted(windows.items(), key=lambda kv: kv[1].get("window_start") or "")[-1024:]
+        windows = dict(newest)
+    kv_set(db, RATE_KEY, {"windows": windows})
 
 
 # ---------------------------------------------------------------- stage one --
 def stage_one(db, username: str, password: str, shortcut: str, ip: str = "",
               user_agent: str = "") -> dict[str, Any]:
-    _throttle(db, ip or "global")
+    # Per client address *and* per claimed username: one noisy source can no
+    # longer exhaust the whole install's login budget, and distributed guessing
+    # against a single account is still bounded.
+    # The address budget is deliberately wider than the identity budget:
+    # several operators legitimately share one NAT address, so one account's
+    # failed logins must not block its colleagues, while a host still cannot
+    # run unbounded guessing across many usernames.
+    _throttle(db, f"stage1:ip:{ip or 'unknown'}", limit=config.RATE_LIMIT_ATTEMPTS * 10)
+    _throttle(db, f"stage1:user:{(username or 'unknown').lower()}")
     user = db.execute(select(User).where(User.username == username)).scalar_one_or_none()
 
     if user is not None and _naive_safe(user.locked_until) and _naive_safe(user.locked_until) > utcnow():
@@ -180,11 +207,37 @@ def stage_two(db, session: Session, pin: str, ip: str = "") -> dict[str, Any]:
     user = db.get(User, session.user_id)
     if user is None:
         raise AuthError("Session user missing", "NO_USER", 401)
+    if _naive_safe(user.locked_until) and _naive_safe(user.locked_until) > utcnow():
+        raise AuthError(f"Account locked until {user.locked_until.isoformat()}", "LOCKED", 423)
+    _throttle(db, f"stage2:session:{session.id}")
     if not security.verify_secret(user.pin_hash, pin):
+        fail_key = f"stage2_fail:{session.id}"
+        state = kv_get(db, fail_key, {"hits": 0}) or {"hits": 0}
+        hits = int(state.get("hits", 0)) + 1
+        kv_set(db, fail_key, {"hits": hits})
+        user.failed_count += 1
+        locked = False
+        if user.failed_count >= config.MAX_LOGIN_FAILURES:
+            user.locked_until = utcnow() + dt.timedelta(minutes=config.LOCKOUT_MINUTES)
+            user.failed_count = 0
+            locked = True
+            audit.record("auth.lockout", actor=user.username, target=user.username,
+                         detail={"minutes": config.LOCKOUT_MINUTES, "stage": 2}, db=db)
+        if hits >= STAGE2_MAX_ATTEMPTS:
+            session.revoked = True
+        db.commit()
         audit.record("auth.stage2.failed", actor=user.username, target=user.username,
-                     detail={"ip": ip, "session": session.id}, db=db)
+                     detail={"ip": ip, "session": session.id, "attempt": hits,
+                             "session_revoked": bool(session.revoked)}, db=db)
+        if session.revoked:
+            raise AuthError(f"Too many invalid PIN attempts ({hits}); session revoked, "
+                            "start again at stage 1.", "PIN_ATTEMPTS_EXCEEDED", 423)
+        if locked:
+            raise AuthError(f"Account locked until {user.locked_until.isoformat()}", "LOCKED", 423)
         raise AuthError("Invalid stage-2 PIN.", "INVALID_PIN", 401)
     session.stage = 2
+    user.failed_count = 0
+    kv_set(db, f"stage2_fail:{session.id}", {"hits": 0})
     db.commit()
     audit.record("auth.stage2.ok", actor=user.username, target=user.username,
                  detail={"ip": ip, "session": session.id}, db=db)

@@ -11,6 +11,7 @@ import datetime as dt
 import hashlib
 import io
 import json
+import threading
 from typing import Any
 
 from sqlalchemy import func, select
@@ -18,6 +19,12 @@ from sqlalchemy import func, select
 from backend.database import AuditEvent, SessionLocal, utcnow
 
 GENESIS = "0" * 64
+
+# Serialises "read last event -> compute seq/hash -> insert". Without it two
+# request threads can read the same tail and both claim seq N: one insert then
+# collides (or, with no unique index, produces a duplicate seq that makes every
+# later hash unverifiable even though nothing was tampered with).
+_SEQ_LOCK = threading.Lock()
 
 
 def _canonical(payload: dict[str, Any]) -> str:
@@ -46,20 +53,21 @@ def record(action: str, actor: str = "system", target: str = "", detail: dict | 
     if own:
         db = SessionLocal()
     try:
-        last = db.execute(select(AuditEvent).order_by(AuditEvent.seq.desc()).limit(1)).scalar_one_or_none()
-        seq = 1 if last is None else last.seq + 1
-        prev_hash = GENESIS if last is None else last.hash
-        ts = utcnow()
-        body = {
-            "seq": seq, "ts": _ts_repr(ts), "actor": actor, "action": action,
-            "target": target, "detail": detail or {},
-        }
-        h = hashlib.sha256((prev_hash + _canonical(body)).encode("utf-8")).hexdigest()
-        ev = AuditEvent(seq=seq, ts=ts, actor=actor, action=action, target=target,
-                        detail=detail or {}, prev_hash=prev_hash, hash=h)
-        db.add(ev)
-        db.commit()
-        return {"seq": seq, "hash": h, "ts": ts.isoformat(), "action": action}
+        with _SEQ_LOCK:
+            last = db.execute(select(AuditEvent).order_by(AuditEvent.seq.desc()).limit(1)).scalar_one_or_none()
+            seq = 1 if last is None else last.seq + 1
+            prev_hash = GENESIS if last is None else last.hash
+            ts = utcnow()
+            body = {
+                "seq": seq, "ts": _ts_repr(ts), "actor": actor, "action": action,
+                "target": target, "detail": detail or {},
+            }
+            h = hashlib.sha256((prev_hash + _canonical(body)).encode("utf-8")).hexdigest()
+            ev = AuditEvent(seq=seq, ts=ts, actor=actor, action=action, target=target,
+                            detail=detail or {}, prev_hash=prev_hash, hash=h)
+            db.add(ev)
+            db.commit()
+            return {"seq": seq, "hash": h, "ts": ts.isoformat(), "action": action}
     finally:
         if own:
             db.close()

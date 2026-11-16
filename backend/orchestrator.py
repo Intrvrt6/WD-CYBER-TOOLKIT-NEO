@@ -88,9 +88,11 @@ def assessment_dict(a: Assessment) -> dict[str, Any]:
 
 
 # -------------------------------------------------------------- job runner --
-def start_job(db, assessment: Assessment, authz_id: str, actor: str) -> dict[str, Any]:
+def start_job(db, assessment: Assessment, authz_id: str, actor: str,
+              user: User | None = None) -> dict[str, Any]:
     emergency_stop.require_clear(db)
-    authorization.assert_valid(db, authz_id, list(assessment.targets or []))
+    authorization.assert_valid(db, authz_id, list(assessment.targets or []),
+                               user_id=user.id if user is not None else None)
     job = Job(assessment_id=assessment.id, status="queued")
     db.add(job)
     assessment.authz_id = authz_id

@@ -136,7 +136,7 @@ class Finding(Base):
 class AuditEvent(Base):
     __tablename__ = "audit_events"
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uuid)
-    seq: Mapped[int] = mapped_column(Integer, nullable=False)
+    seq: Mapped[int] = mapped_column(Integer, nullable=False, unique=True, index=True)
     ts: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     actor: Mapped[str] = mapped_column(String(64), default="system")
     action: Mapped[str] = mapped_column(String(80), nullable=False)

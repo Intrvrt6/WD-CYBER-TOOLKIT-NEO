@@ -47,11 +47,17 @@ No plaintext password, PIN or shortcut is ever stored. `security.hash_secret` re
 
 - **Account lockout**: 5 consecutive failures (configurable) lock the account for 15 minutes;
   the lockout is recorded in the audit chain.
-- **Rate limiting**: a sliding window of 10 attempts per 60 s per client IP, returning `429`.
-- Both counters are server-side and survive client restarts.
-- Authentication failures are audited with the reason (`bad_credentials` / `bad_shortcut`).
+- **Rate limiting**: a sliding window per *key*, both server-side and surviving client restarts.
+  Stage 1 counts `stage1:user:<username>` at `WD_RATE_LIMIT_ATTEMPTS` (default 10/60 s) and
+  `stage1:ip:<address>` at ten times that budget, returning `429 RATE_LIMITED`. The identity budget
+  bounds guessing against one account; the wider address budget accommodates several operators
+  behind one NAT address without letting a single host guess across many usernames.
+- **Stage-2 PIN ceiling**: `WD_STAGE2_MAX_ATTEMPTS` (default 5) wrong PINs on one session revoke
+  that session (`423 PIN_ATTEMPTS_EXCEEDED`) and additionally count toward the account lockout, so
+  a 6-8 digit PIN cannot be iterated.
+- Authentication failures are audited with the reason (`bad_credentials` / `bad_shortcut`), and PIN
+  failures record the attempt number and whether the session was revoked.
 
-Note: lockout applies to the operator account; rate limiting is global per window in this release
 (see `backend/authentication.py::_throttle`) rather than per username.
 
 ## 5. Scope and authorization discipline
@@ -59,12 +65,18 @@ Note: lockout applies to the operator account; rate limiting is global per windo
 Three independent gates must pass before any active test runs:
 
 1. **Scope registry** — the target (or a covering CIDR/domain/URL prefix) is registered.
-2. **Authorization token** — exists, `confirmed`, unexpired, not revoked, and its `targets` list is a
+2. **Authorization token** — exists, `confirmed`, unexpired, not revoked, **granted to the
+   operator who is running the test** (`AUTHZ_FOREIGN` otherwise), and its `targets` list is a
    superset of the requested targets (`AUTHZ_TARGET_MISMATCH` otherwise).
 3. **Emergency-stop gate** — the stop must be clear.
 
 The authorization also snapshots the scope match at issue time, so the audit trail records exactly
 what was considered in scope when approval was given.
+
+Active **integration** routes (`POST /api/integrations/katana/crawl`, `/nuclei/sqli`,
+`/ksubdomain/enum`) run real tools against a caller-supplied target, so they pass the same gates: a
+stage-2 session on a rotated password, a target inside the registered scope, and a clear emergency
+stop. They were previously reachable with a stage-1 session and no scope check at all.
 
 ## 6. Session lifecycle
 
@@ -101,14 +113,25 @@ hash_n = sha256( hash_{n-1} || canonical_json({seq, ts, actor, action, target, d
 
 - `ts` is normalised to `%Y-%m-%dT%H:%M:%S.%f` UTC **before** hashing, so the digest is stable even
   though SQLite does not persist timezone offsets.
-- `seq` must be contiguous; a gap means rows were deleted.
+- `seq` must be contiguous and unique (a unique index enforces it on new databases); a gap means
+  rows were deleted. Appends are serialised by a process lock, so two concurrent requests cannot
+  both claim the same sequence number and manufacture a false tamper signal.
 - `verify_chain()` recomputes from genesis and reports the first broken `seq` and the reason.
+  Detection is retrospective: it proves that an alteration happened, it does not prevent one.
 - Exports: JSON (full detail) and CSV (flat, for SIEM ingestion).
 
 Because the chain is computed over every field of every event, altering an actor, action, target,
 timestamp or detail value invalidates that event and every later one.
 
-## 10. Operational hardening checklist
+## 10. Static-file containment
+
+The console is served by a SPA catch-all. The requested path is resolved and must stay inside
+`frontend/` before anything is returned, and only known asset extensions are served as files; every
+other route falls back to `index.html`. Without that containment the catch-all served
+`frontend/../database/bootstrap_credentials.txt` (password, PIN and shortcut in cleartext) to any
+unauthenticated caller.
+
+## 11. Operational hardening checklist
 
 - [ ] Delete `database/bootstrap_credentials.txt` after storing the values.
 - [ ] Rotate password + PIN after first login.
