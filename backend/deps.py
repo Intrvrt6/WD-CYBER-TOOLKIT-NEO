@@ -52,6 +52,24 @@ def require_stage2(p: Principal = Depends(current_principal)) -> Principal:
     return p
 
 
+def require_stage2_fresh_password(p: Principal = Depends(require_stage2)) -> Principal:
+    """Stage-2 gate that also refuses a session still holding a generated password.
+
+    `must_change_password` is set on every bootstrap install so a shared or
+    printed one-time password cannot be used for real work. Advertising the flag
+    in /api/auth/me was not enough: nothing stopped an operator from running
+    assessments with it, so the documented "forces a first-login rotation" did
+    not hold. 428 is returned (not 403) because the fix is a further step the
+    caller can take, and the frontend turns it into the rotation prompt.
+    """
+    if p.user.must_change_password:
+        raise HTTPException(status_code=428, detail={
+            "code": "PASSWORD_CHANGE_REQUIRED",
+            "message": "Change the bootstrap password before authorizing or executing tests.",
+        })
+    return p
+
+
 def require_role(*roles: str):
     def _dep(p: Principal = Depends(current_principal)) -> Principal:
         if p.role not in roles:

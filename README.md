@@ -90,7 +90,7 @@ export WD_SHORTCUT=WD-XXXXXXXXXXXXX
 ./scripts/run.sh
 ```
 
-Run the test suite (77 tests: hashing, auth, lockout, scope, authorization gates, audit chain,
+Run the test suite (101 tests: hashing, auth, lockout, scope, authorization gates, audit chain,
 emergency stop, engine contract, full API flow):
 
 ```bash
@@ -268,7 +268,7 @@ WD-CYBER-TOOLKIT-NEO/
 ├── database/                 SQLite DB + one-time bootstrap credentials
 ├── evidence/                 per-assessment evidence artifacts
 ├── reports/                  generated reports + run logs
-├── tests/                    pytest suite (77 tests)
+├── tests/                    pytest suite (101 tests)
 ├── scripts/                  install.sh, run.sh, test.sh
 ├── docs/                     ARCHITECTURE.md, OPERATOR_MANUAL.md, API.md, SECURITY.md
 ├── requirements.txt

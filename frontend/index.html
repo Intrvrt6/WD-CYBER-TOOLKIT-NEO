@@ -50,6 +50,7 @@
       <span id="stop-badge" class="badge stop hidden">EMERGENCY STOP</span>
       <span id="session-badge" class="badge">stage 0</span>
       <button class="btn danger sm" id="btn-stop-all" title="Halt all execution server-side">EMERGENCY STOP</button>
+      <button class="btn ghost sm" id="btn-account" title="Rotate password / PIN">ACCOUNT</button>
       <button class="btn ghost sm" id="btn-logout">LOGOUT</button>
     </div>
   </header>
@@ -66,6 +67,7 @@
     <button data-view="caps">Capabilities</button>
     <button data-view="artax">Artax AI</button>
     <button data-view="integrations">Integrations</button>
+    <button data-view="account">Account</button>
   </nav>
 
   <main id="main" class="main">
@@ -273,6 +275,40 @@
         <div id="int-templates" class="table-wrap"></div>
       </div>
     </section>
+
+    <!-- ------------------------------------------------------- account -->
+    <section class="view hidden" id="view-account">
+      <div class="view-head"><h2>Operator Account</h2><span class="muted" id="acct-who"></span></div>
+      <div class="card" id="acct-rotate-warning" style="display:none">
+        <h3 style="margin-top:0;color:#fca5a5">Password rotation required</h3>
+        <p class="muted small" style="margin-top:0">
+          This operator is still using the one-time bootstrap password printed on first boot.
+          Authorizing and executing assessments is blocked (<code>428 PASSWORD_CHANGE_REQUIRED</code>)
+          until it is changed.
+        </p>
+      </div>
+      <div class="card">
+        <h3>Change password</h3>
+        <form id="pw-form" class="col-form">
+          <label>Current password<input id="pw-old" type="password" autocomplete="current-password" required></label>
+          <label>New password (min 12 chars, 3 of 4 classes)
+            <input id="pw-new" type="password" autocomplete="new-password" required minlength="12"></label>
+          <label>Repeat new password<input id="pw-new2" type="password" autocomplete="new-password" required minlength="12"></label>
+          <div class="row-form"><button class="btn" type="submit">UPDATE PASSWORD</button>
+          <span class="gate-msg" id="pw-msg"></span></div>
+        </form>
+      </div>
+      <div class="card">
+        <h3>Change stage-2 PIN</h3>
+        <form id="pin-form" class="col-form">
+          <label>Current password<input id="pin-pass" type="password" autocomplete="current-password" required></label>
+          <label>New PIN (min 6 digits)<input id="pin-new" type="password" inputmode="numeric" minlength="6" required></label>
+          <div class="row-form"><button class="btn" type="submit">UPDATE PIN</button>
+          <span class="gate-msg" id="pin-msg"></span></div>
+        </form>
+      </div>
+    </section>
+
   </main>
 </div>
 

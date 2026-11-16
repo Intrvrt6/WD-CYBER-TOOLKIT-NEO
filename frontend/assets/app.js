@@ -54,6 +54,10 @@
     $('#gate').classList.add('hidden');
     $('#shell').classList.remove('hidden');
     badge($('#session-badge'), 'STAGE ' + WD.state.stage);
+    try { S.me = await WD.me(); } catch { S.me = null; }
+    if (S.me && S.me.user && S.me.user.must_change_password) {
+      toast('Bootstrap password in use — rotate it in Account before executing tests.', 'warn');
+    }
     await Promise.all([loadTemplates(), loadModules(), loadCaps()]);
     await refreshAll();
     switchView('dashboard');
@@ -68,7 +72,8 @@
     $('#nav').classList.remove('open');
     const loaders = { dashboard: refreshAll, modules: renderModules, scope: loadScope,
       runs: loadRuns, findings: prepFindings, reports: prepReports, audit: loadAudit,
-      caps: renderCaps, artax: initArtax, integrations: initIntegrations };
+      caps: renderCaps, artax: initArtax, integrations: initIntegrations,
+      account: renderAccount };
     if (loaders[name]) loaders[name]().catch(e => toast(e.message, 'err'));
   }
   $$('#nav button').forEach(b => b.addEventListener('click', () => switchView(b.dataset.view)));
@@ -601,7 +606,58 @@
   });
 
   /* -------------------------------------------------------- stop / logout -- */
-  $('#btn-stop-all').addEventListener('click', async () => {
+  /* ------------------------------------------------------------ account -- */
+  function renderAccount() {
+    const u = (S.me && S.me.user) || {};
+    $('#acct-who').textContent = (u.username || '') + (u.role ? ' · ' + u.role : '') +
+      (u.must_change_password ? ' · rotation pending' : '');
+    $('#acct-rotate-warning').style.display = u.must_change_password ? '' : 'none';
+    $('#pw-msg').textContent = '';
+    $('#pin-msg').textContent = '';
+  }
+
+  async function refreshMe() {
+    S.me = await WD.me();
+    $('.badge').classList.remove('hidden');
+    return S.me;
+  }
+
+  $('#btn-account').addEventListener('click', () => switchView('account'));
+
+  $('#pw-form').addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const msg = $('#pw-msg');
+    const oldPw = $('#pw-old').value, a = $('#pw-new').value, b = $('#pw-new2').value;
+    if (a !== b) { msg.textContent = 'New passwords do not match.'; msg.className = 'gate-msg err'; return; }
+    if (a.length < 12) { msg.textContent = 'Minimum 12 characters.'; msg.className = 'gate-msg err'; return; }
+    try {
+      await WD.changePassword(oldPw, a);
+      $('#pw-old').value = $('#pw-new').value = $('#pw-new2').value = '';
+      msg.textContent = 'Password updated. Authorizing and execution are now unlocked.';
+      msg.className = 'gate-msg ok';
+      toast('Password updated', 'ok');
+      await refreshMe();
+      renderAccount();
+    } catch (e) {
+      msg.textContent = e.message; msg.className = 'gate-msg err';
+    }
+  });
+
+  $('#pin-form').addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const msg = $('#pin-msg');
+    try {
+      await WD.changePin($('#pin-pass').value, $('#pin-new').value);
+      $('#pin-pass').value = $('#pin-new').value = '';
+      msg.textContent = 'Stage-2 PIN updated.';
+      msg.className = 'gate-msg ok';
+      toast('PIN updated', 'ok');
+    } catch (e) {
+      msg.textContent = e.message; msg.className = 'gate-msg err';
+    }
+  });
+
+    $('#btn-stop-all').addEventListener('click', async () => {
     if (!confirm('EMERGENCY STOP will abort running assessments, kill managed subprocesses, revoke authorizations and require fresh authentication. Continue?')) return;
     try {
       const r = await WD.stop('operator pressed emergency stop');

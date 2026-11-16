@@ -42,6 +42,10 @@ const WD = (() => {
     stage2: (pin) => call('/api/auth/stage2', { method: 'POST', body: { pin } }),
     me: () => call('/api/auth/me'),
     logout: () => call('/api/auth/logout', { method: 'POST' }),
+    changePassword: (old_password, new_password) =>
+      call('/api/auth/password', { method: 'POST', body: { old_password, new_password } }),
+    changePin: (password, new_pin) =>
+      call('/api/auth/pin', { method: 'POST', body: { password, new_pin } }),
     health: () => call('/api/health'),
     caps: () => call('/api/capabilities'),
     modules: () => call('/api/modules'),

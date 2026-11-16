@@ -13,7 +13,8 @@ from backend import (audit, authorization, capabilities, emergency_stop, orchest
                      runner, templates_registry)
 from backend.database import (Artifact, Assessment, Authorization, Finding, ScopeEntry,
                               get_db)
-from backend.deps import Principal, current_principal, require_role, require_stage2
+from backend.deps import (Principal, current_principal, require_role,
+                         require_stage2, require_stage2_fresh_password)
 
 router = APIRouter(prefix="/api", tags=["platform"])
 
@@ -114,7 +115,7 @@ class AuthzIn(BaseModel):
 
 
 @router.post("/authorizations")
-def create_authz(body: AuthzIn, p: Principal = Depends(require_stage2),
+def create_authz(body: AuthzIn, p: Principal = Depends(require_stage2_fresh_password),
                  db: OrmSession = Depends(get_db)):
     emergency_stop.require_clear(db)
     try:
@@ -147,7 +148,7 @@ class AssessmentIn(BaseModel):
 
 
 @router.post("/assessments")
-def create_assessment(body: AssessmentIn, p: Principal = Depends(require_stage2),
+def create_assessment(body: AssessmentIn, p: Principal = Depends(require_stage2_fresh_password),
                       db: OrmSession = Depends(get_db)):
     try:
         return orchestrator.create_assessment(db, p.user, body.name, body.template,
@@ -183,7 +184,7 @@ class RunIn(BaseModel):
 
 
 @router.post("/assessments/{assessment_id}/run")
-def run_assessment(assessment_id: str, body: RunIn, p: Principal = Depends(require_stage2),
+def run_assessment(assessment_id: str, body: RunIn, p: Principal = Depends(require_stage2_fresh_password),
                    db: OrmSession = Depends(get_db)):
     a = db.get(Assessment, assessment_id)
     if a is None:
