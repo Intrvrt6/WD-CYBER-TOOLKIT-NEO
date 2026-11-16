@@ -344,6 +344,10 @@ class SocialEngine:
                                         "using these artefacts in any campaign."),
                            asset=fields["organization"], source="lab",
                            remediation="Pass params.authorization_ref with the signed engagement identifier.",
+                           evidence=[{"type": "other",
+                                      "summary": "rendered templates embed no authorization reference",
+                                      "authorization_ref": fields["authorization_ref"],
+                                      "affects": "SOC-03 rendered artefacts"}],
                            data={"authorization_ref": fields["authorization_ref"]}))
 
     # ------------------------------------------------------------ SOC-04 ----

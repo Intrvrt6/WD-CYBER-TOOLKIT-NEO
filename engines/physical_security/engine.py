@@ -184,7 +184,10 @@ class PhysicalEngine:
             status = "fail" if failed else "pass"
             source = "local"
         else:
-            status, source = "info", "unavailable"
+            # No control in this domain was observed, so there is no evidence.
+            # Status must say so too: "info" + source="unavailable" would be a
+            # self-contradicting record (it implies an observation was made).
+            status, source = "unavailable", "unavailable"
         desc = (f"{len(items)} control(s) in '{domain}': {len(observed)} observed "
                 f"({len(observed) - len(failed)} pass / {len(failed)} fail), "
                 f"{len(na)} not applicable, {len(unobs)} not observed.")
@@ -321,7 +324,9 @@ class PhysicalEngine:
 
         art = ctx.save_text("physical_risk_summary.csv", score_csv(all_rows, score, completeness))
         ctx.add(Result("PHY-06", "Aggregate physical risk score",
-                       "info" if score is None else ("fail" if failed else "pass"),
+                       # No observed control -> no score -> the check could not
+                       # reach a verdict, so it is reported as unavailable.
+                       "unavailable" if score is None else ("fail" if failed else "pass"),
                        severity=("high" if len(failed) >= 5 else "medium" if failed else "info"),
                        description=desc, asset=ctx.params.get("site_name")
                        or (ctx.targets[0] if ctx.targets else "site"),

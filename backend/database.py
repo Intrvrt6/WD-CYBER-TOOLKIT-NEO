@@ -121,6 +121,9 @@ class Finding(Base):
     assessment_id: Mapped[str] = mapped_column(String(32), ForeignKey("assessments.id"), nullable=False)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     severity: Mapped[str] = mapped_column(String(16), default="info")
+    # The engine verdict for this check (pass|fail|info|unavailable|error).
+    # Persisted so a report can tell "ran and passed" from "could not run".
+    status: Mapped[str] = mapped_column(String(16), default="info")
     description: Mapped[str] = mapped_column(Text, default="")
     evidence_source: Mapped[str] = mapped_column(String(24), default="live")
     cvss_score: Mapped[float | None] = mapped_column(Float)
@@ -183,8 +186,47 @@ engine = create_engine(config.DATABASE_URL, future=True, pool_pre_ping=True, con
 SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False, future=True)
 
 
+def _reconcile_columns() -> list[str]:
+    """Add columns that exist on the models but not yet in the database.
+
+    `create_all` only creates missing tables. A deployment upgraded from an
+    earlier release would otherwise break on a new column (SQLite reports
+    "no such column"). This is deliberately minimal and non-destructive: it
+    only ever ADDs, never drops or alters. Returns the operations performed.
+    """
+    from sqlalchemy import inspect, text
+
+    performed: list[str] = []
+    inspector = inspect(engine)
+    existing_tables = set(inspector.get_table_names())
+    for table in Base.metadata.sorted_tables:
+        if table.name not in existing_tables:
+            continue
+        present = {col["name"] for col in inspector.get_columns(table.name)}
+        for column in table.columns:
+            if column.name in present:
+                continue
+            try:
+                col_type = column.type.compile(dialect=engine.dialect)
+            except Exception:
+                col_type = "TEXT"
+            ddl = f'ALTER TABLE {table.name} ADD COLUMN {column.name} {col_type}'
+            with engine.begin() as conn:
+                conn.execute(text(ddl))
+            performed.append(ddl)
+    return performed
+
+
 def init_db() -> None:
     Base.metadata.create_all(engine)
+    try:
+        _reconcile_columns()
+    except Exception:  # pragma: no cover - never block startup on reconciliation
+        import logging
+        logging.getLogger("wd.neo.database").warning(
+            "schema reconciliation failed; the database may be from a newer release",
+            exc_info=True,
+        )
 
 
 def get_db():

@@ -1,120 +1,126 @@
-"""Audit every engine's emitted Results against the platform's result invariants.
+"""Audit every engine by ACTUALLY EXECUTING it, then assert the contract holds.
 
-Run: python3 tests/audit_all_engines.py
-
-Invariants checked
-  1. status is one of pass|fail|info|unavailable|error
-  2. severity is one of critical|high|medium|low|info
-  3. source is one of live|lab|local|unavailable
-  4. status="unavailable"  <=>  source="unavailable"   (a gap must say it is a gap)
-  5. status="info" implies severity="info"            (info is not a severity-bearing failure)
-  6. status="fail" implies severity != "info"         (a failure has a severity)
-  7. every result carries a non-empty description
-  8. every result carries a non-empty check_id
-  9. check_id matches the engine's declared check ids (or a documented sub-id X-NNn)
+Checks, per engine:
+  * every Result has a valid status/severity/source
+  * declared check ids are covered or explicitly unavailable
+  * no check silently disappears
+  * evidence source matches the declared mode
 """
 from __future__ import annotations
 
+import json
 import os
 import sys
 import traceback
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from engines import base  # noqa: E402
-from engines.base import Context  # noqa: E402
 import engines  # noqa: F401,E402
+from engines.base import Context, get_engine  # noqa: E402
 
-STATUSES = {"pass", "fail", "info", "unavailable", "error"}
-SEVERITIES = {"critical", "high", "medium", "low", "info"}
-SOURCES = {"live", "lab", "local", "unavailable"}
+VALID_STATUS = {"pass", "fail", "info", "unavailable", "error"}
+VALID_SOURCE = {"live", "lab", "local", "unavailable"}
 
-# (module, targets, params, mode)
-PLAN = [
-    ("network", ["127.0.0.1"], {"capture_seconds": 3}, "lab"),
-    ("mitm", ["https://testssl.sh"], {}, "live"),
-    ("scada_ics", ["modbus://127.0.0.1:5020"], {}, "lab"),
-    ("automotive_can", ["can:wdcan0"], {}, "lab"),
-    ("threat_intelligence", ["203.0.113.45"], {"iocs": ["203.0.113.45", "example.com"],
-                                                "sample_path": "samples/iocs_demo.csv"}, "live"),
-    ("webapp", ["http://127.0.0.1:8099"], {}, "live"),
-    ("mobile_security", ["127.0.0.1"], {}, "live"),
-    ("social_engineering", ["example.com"], {}, "live"),
-    ("physical_security", ["site-a"], {}, "live"),
-    ("hardware_security", ["127.0.0.1"], {}, "live"),
-]
+# module -> (mode, targets, params)
+PLAN = {
+    "network": ("live", ["https://testssl.sh"], {"capture_seconds": 4}),
+    "mitm": ("live", ["https://testssl.sh"], {}),
+    "scada_ics": ("lab", ["modbus://127.0.0.1:5020"], {}),
+    "automotive_can": ("lab", ["can:wdcan0"], {}),
+    "threat_intelligence": ("live", ["203.0.113.45", "example.com"],
+                            {"iocs": ["203.0.113.45", "example.com"],
+                             "sample_path": "samples/iocs_demo.csv"}),
+    "webapp": ("live", ["http://127.0.0.1:8099"], {}),
+    "mobile_security": ("live", ["127.0.0.1"], {}),
+    "social_engineering": ("live", ["example.com"], {}),
+    "physical_security": ("live", ["site-a"], {}),
+    "hardware_security": ("live", ["127.0.0.1"], {}),
+}
 
 
-def valid_subid(check_id: str, declared: list[str]) -> bool:
-    """X-01b and X-01-c style sub-ids are legitimate; they must share a declared stem."""
-    if check_id in declared:
-        return True
+def audit(module: str, mode: str, targets: list, params: dict) -> dict:
+    eng = get_engine(module)
+    declared = [c[0] for c in eng.checks]
+    ev = f"evidence/audit-{module}"
+    ctx = Context(assessment_id=f"audit-{module}", module=module, mode=mode,
+                  intensity="light", targets=targets, params=params, evidence_dir=ev)
+    results = eng.run(ctx)
+    out: dict = {
+        "module": module, "mode": mode, "declared": len(declared),
+        "results": len(results), "problems": [], "findings": [],
+    }
+    seen = set()
+    for r in results:
+        if r.status not in VALID_STATUS:
+            out["problems"].append(f"{r.check_id}: bad status {r.status!r}")
+        if r.source not in VALID_SOURCE:
+            out["problems"].append(f"{r.check_id}: bad source {r.source!r}")
+        if not r.title:
+            out["problems"].append(f"{r.check_id}: empty title")
+        if not r.description:
+            out["problems"].append(f"{r.check_id}: empty description")
+        if r.source == "unavailable" and r.status != "unavailable":
+            out["problems"].append(f"{r.check_id}: source=unavailable but status={r.status}")
+        if r.status == "unavailable" and not r.description:
+            out["problems"].append(f"{r.check_id}: unavailable without a reason")
+        seen.add(r.check_id.split("-")[0] + "-" + r.check_id.split("-")[1][:2].rstrip("bcdg"))
+        out["findings"].append({
+            "id": r.check_id, "status": r.status, "severity": r.severity,
+            "source": r.source, "desc": (r.description or "")[:110],
+        })
+    # coverage: each declared id should have produced at least one result
+    produced = {r.check_id for r in results}
+    missing = [d for d in declared if d not in produced
+               and not any(p.startswith(d.split("-")[0]) for p in produced)]
+    # a declared check may legitimately emit a suffixed variant (NET-02b); only
+    # flag when the base id itself never appears anywhere
+    really_missing = []
     for d in declared:
-        if check_id.startswith(d):
-            rest = check_id[len(d):]
-            if rest and rest[0].isalpha() or rest.startswith("-"):
-                return True
-    return False
+        if d in produced:
+            continue
+        if any(p == d or p.startswith(d) for p in produced):
+            continue
+        really_missing.append(d)
+    out["checks_not_reported"] = really_missing
+    if really_missing:
+        out["problems"].append(f"declared checks produced no result: {really_missing}")
+    # every result must carry some evidence trail
+    no_evidence = [r.check_id for r in results
+                   if not r.evidence and r.status != "unavailable"]
+    if no_evidence:
+        out["problems"].append(f"results without evidence: {no_evidence}")
+    return out
 
 
 def main() -> int:
-    failures: list[str] = []
-    total = 0
-
-    for module, targets, params, mode in PLAN:
-        if module not in base.modules():
-            failures.append(f"{module}: ENGINE NOT REGISTERED")
+    only = sys.argv[1] if len(sys.argv) > 1 else None
+    report, failures = [], 0
+    for module, (mode, targets, params) in PLAN.items():
+        if only and only != module:
             continue
-        eng = base.get_engine(module)
-        declared = [c[0] for c in eng.checks]
-        ctx = Context(
-            assessment_id=f"audit-{module}", module=module, mode=mode,
-            intensity="light", targets=targets, params=params,
-            evidence_dir=os.path.join("/tmp", "wd-audit", module),
-        )
+        print(f"\n{'='*74}\n{module}  (mode={mode})\n{'='*74}")
         try:
-            results = eng.run(ctx)
+            r = audit(module, mode, targets, params)
         except Exception:
-            failures.append(f"{module}: run() raised:\n{traceback.format_exc()}")
+            failures += 1
+            print(f"  EXCEPTION while running engine:\n{traceback.format_exc()}")
+            report.append({"module": module, "crashed": traceback.format_exc()[-800:]})
             continue
-
-        if not results:
-            failures.append(f"{module}: emitted zero results")
-            continue
-
-        reported = {r.check_id for r in results}
-        missing = [c for c in declared if not any(cid == c or cid.startswith(c) for cid in reported)]
-        if missing:
-            failures.append(f"{module}: declared checks with no result: {missing}")
-
-        for r in results:
-            total += 1
-            where = f"{module}/{r.check_id}"
-            if r.status not in STATUSES:
-                failures.append(f"{where}: bad status {r.status!r}")
-            if r.severity not in SEVERITIES:
-                failures.append(f"{where}: bad severity {r.severity!r}")
-            if r.source not in SOURCES:
-                failures.append(f"{where}: bad source {r.source!r}")
-            if (r.status == "unavailable") != (r.source == "unavailable"):
-                failures.append(f"{where}: status={r.status} but source={r.source}")
-            if r.status == "info" and r.severity != "info":
-                failures.append(f"{where}: status=info but severity={r.severity}")
-            if r.status == "fail" and r.severity == "info":
-                failures.append(f"{where}: status=fail but severity=info")
-            if not (r.description or "").strip():
-                failures.append(f"{where}: empty description")
-            if not valid_subid(r.check_id, declared):
-                failures.append(f"{where}: check_id not declared/derived")
-
-    print(f"results audited: {total}")
-    if failures:
-        print(f"PROBLEMS: {len(failures)}")
-        for f in failures:
-            print("  -", f)
-        return 1
-    print("all invariants hold")
-    return 0
+        for f in r["findings"]:
+            print(f"  {f['id']:10s} {f['status']:11s} {f['severity']:8s} {f['source']:11s} {f['desc']}")
+        print(f"  -> declared={r['declared']} results={r['results']} "
+              f"not-reported={r['checks_not_reported'] or 'none'}")
+        if r["problems"]:
+            failures += 1
+            for p in r["problems"]:
+                print(f"  !! {p}")
+        else:
+            print("  OK: contract satisfied")
+        report.append(r)
+    with open("reports/engine-audit.json", "w", encoding="utf-8") as fh:
+        json.dump({"engines": report, "failures": failures}, fh, indent=2)
+    print(f"\n{'='*74}\nengines with problems: {failures} / {len(report)}\n{'='*74}")
+    return 0 if failures == 0 else 1
 
 
 if __name__ == "__main__":

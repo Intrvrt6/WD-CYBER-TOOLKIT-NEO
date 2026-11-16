@@ -1007,7 +1007,8 @@ class CANEngine:
             fully_static = [d for d in static_rows if d["distinct_payloads"] == 1]
             medium = still_sev_hi(fully_static, proven)
             ctx.add(Result(
-                "CAN-06", "Replay-friendly CAN frames accepted", "fail",
+                # Letter suffix keeps ids unique: CAN-06 is the summary row above.
+                "CAN-06b", "Replay-friendly CAN frames accepted", "fail",
                 severity="medium" if medium else "low",
                 description=(f"{ids} carry no rolling counter and no checksum, so a recorded"
                              f" frame is accepted whenever it is injected.{proof}"),

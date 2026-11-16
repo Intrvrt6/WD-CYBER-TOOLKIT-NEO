@@ -1,6 +1,7 @@
 """Assessment engine: preflight -> authorized execution -> evidence -> findings -> risk."""
 from __future__ import annotations
 
+import logging
 import os
 import threading
 import time
@@ -16,6 +17,8 @@ from engines.base import Context, Result, get_engine, module_catalog
 
 SEVERITY_ORDER = {"critical": 4, "high": 3, "medium": 2, "low": 1, "info": 0}
 SEVERITY_SCORE = {"critical": 9.5, "high": 8.0, "medium": 5.5, "low": 2.5, "info": 0.0}
+
+log = logging.getLogger("wd.neo.orchestrator")
 
 _JOBS: dict[str, dict[str, Any]] = {}
 _LOCK = threading.Lock()
@@ -164,6 +167,7 @@ def _run_job(job_id: str, assessment_id: str) -> None:
         for r in results:
             f = Finding(
                 assessment_id=a.id, title=r.title, severity=r.severity,
+                status=r.status or "info",
                 description=(r.description or "")[:8000], evidence_source=r.source,
                 cvss_score=r.cvss_score, cvss_vector=r.cvss_vector, cwe=list(r.cwe or []),
                 remediation=(r.remediation or "")[:4000], asset=(r.asset or "")[:250],
@@ -220,7 +224,10 @@ def _run_job(job_id: str, assessment_id: str) -> None:
             audit.record("assessment.failed", actor=a.operator if a else "system",
                          detail={"assessment": assessment_id, "error": str(exc)[:500]}, db=db)
         except Exception:
-            pass
+            # Recording the failure failed too. Never swallow that silently: a job
+            # left in "running" with no visible cause is worse than a noisy log.
+            log.exception("failed to record failure state for job %s (assessment %s)",
+                          job_id, assessment_id)
     finally:
         db.close()
         _drop_job(job_id)
@@ -312,13 +319,24 @@ def job_state(db, job_id: str) -> dict[str, Any] | None:
             "ended_at": job.ended_at.isoformat() if job.ended_at else None}
 
 
+def _finding_status(f: Finding) -> str:
+    """The engine's real verdict for this check.
+
+    Rows written before the `status` column existed have no value, so
+    fall back to inferring it from severity (the old, lossy behaviour).
+    """
+    if f.status:
+        return f.status
+    return "fail" if f.severity not in ("info",) else "info"
+
+
 def findings_for(db, assessment_id: str) -> list[dict[str, Any]]:
     rows = db.execute(select(Finding).where(Finding.assessment_id == assessment_id)
                       .order_by(Finding.created_at.asc())).scalars().all()
     sev_rank = {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}
     rows = sorted(rows, key=lambda f: (sev_rank.get(f.severity, 9), f.check_id))
     return [{"id": f.id, "check_id": f.check_id, "title": f.title, "severity": f.severity,
-             "status": "fail" if f.severity not in ("info",) else "info",
+             "status": _finding_status(f),
              "description": f.description, "evidence_source": f.evidence_source,
              "cvss_score": f.cvss_score, "cvss_vector": f.cvss_vector, "cwe": f.cwe,
              "remediation": f.remediation, "asset": f.asset, "evidence": f.evidence,

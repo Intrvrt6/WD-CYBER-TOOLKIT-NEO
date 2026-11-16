@@ -217,7 +217,12 @@ class MITMEngine:
         if not ctx.params.get("allow_active"):
             ctx.add(Result("MITM-06", "Active ARP/DNS interception", "info",
                            description="Skipped: active interception requires params.allow_active=true (it injects frames).",
-                           source="local", data={"performed": False}))
+                           source="local",
+                           evidence=[{"type": "other",
+                                      "summary": "active interception not enabled for this assessment",
+                                      "params_allow_active": False,
+                                      "reason": "opted out; no frames were transmitted"}],
+                           data={"performed": False}))
             return
         if ctx.mode != "live":
             ctx.add(unavailable("MITM-06", "Active ARP/DNS interception",
@@ -238,8 +243,13 @@ class MITMEngine:
                        description=(f"Active interception armed on {iface} toward gateway {gw}; raw socket "
                                     f"{'available' if raw_ok else 'NOT available'}. "
                                     "Execution requires scapy ARP reply injection and is only performed on request."),
-                       source="live", data={"gateway": gw, "interface": iface, "raw_socket": raw_ok,
-                                            "rollback": "gratuitous ARP with the true gateway MAC restores caches"}))
+                       source="live",
+                       evidence=[{"type": "other",
+                                  "summary": f"interception armed on {iface}",
+                                  "gateway": gw, "interface": iface, "raw_socket": raw_ok,
+                                  "rollback": "gratuitous ARP with the true gateway MAC restores caches"}],
+                       data={"gateway": gw, "interface": iface, "raw_socket": raw_ok,
+                             "rollback": "gratuitous ARP with the true gateway MAC restores caches"}))
         if ctx.params.get("execute_arp_spoof"):
             try:
                 from scapy.all import ARP, Ether, sendp  # type: ignore
