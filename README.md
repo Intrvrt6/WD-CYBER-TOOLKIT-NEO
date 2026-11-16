@@ -78,6 +78,7 @@ plus a template; no other change is required.
 ```bash
 cd WD-CYBER-TOOLKIT-NEO
 ./scripts/install.sh        # venv + pip deps + capability report
+./android/                  native client: build_apk.sh, prepare_sdk.sh, src/, harness/
 ./scripts/run.sh            # http://0.0.0.0:8000  (API docs at /api/docs)
 ```
 
@@ -94,7 +95,7 @@ export WD_SHORTCUT=WD-XXXXXXXXXXXXX
 ./scripts/run.sh
 ```
 
-Run the test suite (186 collected tests: hashing, auth, lockout, per-identity rate limiting, stage-2 PIN
+Run the test suite (197 collected tests: hashing, auth, lockout, per-identity rate limiting, stage-2 PIN
 ceiling, scope, authorization ownership, static-file containment, audit chain + concurrency,
 emergency stop, engine contract, full API flow):
 
@@ -112,6 +113,21 @@ python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000
 ```
 
 Then browse to the device's IP from any client. The UI is responsive and touch-friendly.
+
+### Native Android client (`android/`)
+
+A dependency-free native Android app for the same API: two-stage unlock, dashboard, assess,
+scope, findings, six-format reports, Artax and audit-chain verification. No Gradle, no Jetpack,
+no network access at build time — the SDK build tools are invoked directly.
+
+```bash
+./android/prepare_sdk.sh      # once: fetches build-tools, android.jar and R8
+./android/build_apk.sh        # -> android/dist/wd-neo.apk (signed, zipaligned)
+./android/run_harness.sh http://127.0.0.1:8000   # 29 core-client checks over real HTTP
+```
+
+The harness compiles the *same* `Json`/`HttpClient`/`WdApi` sources that are packaged into the
+APK and drives the real API, so the client contract is tested without an emulator.
 
 ### Windows
 
@@ -273,7 +289,7 @@ WD-CYBER-TOOLKIT-NEO/
 ├── database/                 SQLite DB + one-time bootstrap credentials
 ├── evidence/                 per-assessment evidence artifacts
 ├── reports/                  generated reports + run logs
-├── tests/                    pytest suite (186 tests)
+├── tests/                    pytest suite (197 tests)
 ├── scripts/                  install.sh, run.sh, test.sh
 ├── docs/                     ARCHITECTURE.md, OPERATOR_MANUAL.md, API.md, SECURITY.md
 ├── requirements.txt
@@ -293,6 +309,8 @@ WD-CYBER-TOOLKIT-NEO/
 - **Physical** assessments are checklist-driven: anything not observed is reported as *not observed*,
   and the risk score stays explicitly incomplete until an operator fills observations.
 - Reports state which checks executed and which did not; a missing check is never rendered as a pass.
+  A check that emits only derived ids (e.g. `CAN-05a..CAN-05e`) still counts its declared parent
+  (`CAN-05`) as executed, and vice versa — the checklist and the findings table always agree.
 
 ---
 

@@ -1,0 +1,458 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- WD NEO main screen: a two-stage login gate and, behind it, the operator shell. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg">
+
+    <!-- ============================== GATE ============================== -->
+    <ScrollView
+        android:id="@+id/gate"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:fillViewport="true"
+        android:padding="20dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <!-- brand -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="WD // NEO"
+                android:textSize="26sp"
+                android:textStyle="bold"
+                android:textColor="@color/accent"
+                android:letterSpacing="0.06" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="CYBER TOOLKIT · PROFESSIONAL ADVANCED"
+                android:textSize="10sp"
+                android:textColor="@color/muted"
+                android:letterSpacing="0.18"
+                android:paddingTop="2dp"
+                android:paddingBottom="22dp" />
+
+            <!-- ===================== stage 1 ===================== -->
+            <LinearLayout
+                android:id="@+id/stage1_box"
+                style="@style/WdCard"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/stage1_hint"
+                    style="@style/WdH2" />
+
+                <TextView style="@style/WdLabel" android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" android:text="@string/label_server" />
+                <EditText
+                    android:id="@+id/in_server"
+                    style="@style/WdInput"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="http://192.168.1.10:8000"
+                    android:inputType="textUri" />
+
+                <TextView style="@style/WdLabel" android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" android:text="@string/label_username"
+                    android:paddingTop="10dp" />
+                <EditText
+                    android:id="@+id/in_user"
+                    style="@style/WdInput"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="WD-OPERATOR-01"
+                    android:inputType="textNoSuggestions" />
+
+                <TextView style="@style/WdLabel" android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" android:text="@string/label_password"
+                    android:paddingTop="10dp" />
+                <EditText
+                    android:id="@+id/in_pass"
+                    style="@style/WdInput"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="operator password"
+                    android:inputType="textPassword" />
+
+                <TextView style="@style/WdLabel" android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" android:text="@string/label_shortcut"
+                    android:paddingTop="10dp" />
+                <EditText
+                    android:id="@+id/in_shortcut"
+                    style="@style/WdInput"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="WD-XXXXXXXXXXXXX"
+                    android:inputType="textCapCharacters" />
+
+                <TextView
+                    android:id="@+id/gate_msg1"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textSize="11.5sp"
+                    android:textColor="@color/warn"
+                    android:paddingTop="10dp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:paddingTop="14dp">
+                    <Button
+                        android:id="@+id/btn_connect"
+                        style="@style/WdButton"
+                        android:layout_width="0dp"
+                        android:layout_weight="1"
+                        android:layout_height="wrap_content"
+                        android:text="@string/action_connect"
+                        android:layout_marginEnd="8dp" />
+                    <Button
+                        android:id="@+id/btn_stage1"
+                        style="@style/WdButtonPrimary"
+                        android:layout_width="0dp"
+                        android:layout_weight="1.4"
+                        android:layout_height="wrap_content"
+                        android:text="@string/action_verify_stage1" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- ===================== stage 2 ===================== -->
+            <LinearLayout
+                android:id="@+id/stage2_box"
+                style="@style/WdCard"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/stage2_hint"
+                    style="@style/WdH2" />
+
+                <TextView style="@style/WdLabel" android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" android:text="@string/label_pin" />
+                <EditText
+                    android:id="@+id/in_pin"
+                    style="@style/WdInput"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="••••••••"
+                    android:inputType="numberPassword"
+                    android:maxLength="12" />
+
+                <TextView
+                    android:id="@+id/gate_msg2"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textSize="11.5sp"
+                    android:textColor="@color/warn"
+                    android:paddingTop="10dp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:paddingTop="14dp">
+                    <Button
+                        android:id="@+id/btn_back"
+                        style="@style/WdButton"
+                        android:layout_width="0dp"
+                        android:layout_weight="1"
+                        android:layout_height="wrap_content"
+                        android:text="@string/action_back"
+                        android:layout_marginEnd="8dp" />
+                    <Button
+                        android:id="@+id/btn_stage2"
+                        style="@style/WdButtonPrimary"
+                        android:layout_width="0dp"
+                        android:layout_weight="1.6"
+                        android:layout_height="wrap_content"
+                        android:text="@string/action_verify_stage2" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/gate_status"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="11sp"
+                android:textColor="@color/dim"
+                android:paddingTop="16dp"
+                android:fontFamily="monospace" />
+        </LinearLayout>
+    </ScrollView>
+
+    <!-- ============================== SHELL ============================= -->
+    <LinearLayout
+        android:id="@+id/shell"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <!-- top bar -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="@color/bg2"
+            android:padding="12dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:text="WD // NEO"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                android:textColor="@color/accent"
+                android:letterSpacing="0.05" />
+
+            <TextView
+                android:id="@+id/badge_stage"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="STAGE 2"
+                android:textSize="9.5sp"
+                android:textColor="@color/accent"
+                android:background="@drawable/bg_chip_sev"
+                android:paddingLeft="8dp" android:paddingRight="8dp"
+                android:paddingTop="4dp" android:paddingBottom="4dp"
+                android:layout_marginEnd="6dp" />
+
+            <TextView
+                android:id="@+id/badge_stop"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="STOP"
+                android:textSize="9.5sp"
+                android:textColor="#FCA5A5"
+                android:background="@drawable/bg_button_danger"
+                android:paddingLeft="8dp" android:paddingRight="8dp"
+                android:paddingTop="4dp" android:paddingBottom="4dp"
+                android:visibility="gone" />
+        </LinearLayout>
+
+        <!-- tab strip -->
+        <HorizontalScrollView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:scrollbars="none"
+            android:background="@color/bg2"
+            android:paddingLeft="8dp" android:paddingRight="8dp" android:paddingBottom="8dp">
+            <LinearLayout
+                android:id="@+id/tabs"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal" />
+        </HorizontalScrollView>
+
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1">
+
+            <!-- DASHBOARD -->
+            <ScrollView android:id="@+id/view_dashboard"
+                android:layout_width="match_parent" android:layout_height="match_parent"
+                android:padding="14dp">
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:orientation="vertical">
+                    <TextView style="@style/WdH2" android:layout_width="wrap_content"
+                        android:layout_height="wrap_content" android:text="Operations Dashboard" />
+                    <LinearLayout android:id="@+id/kpi_row"
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:orientation="horizontal" android:paddingBottom="10dp" />
+                    <TextView android:id="@+id/dash_state" style="@style/WdMono"
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:paddingBottom="12dp" />
+                    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:orientation="horizontal" android:paddingBottom="10dp">
+                        <Button android:id="@+id/btn_refresh" style="@style/WdButton"
+                            android:layout_width="0dp" android:layout_weight="1"
+                            android:layout_height="wrap_content" android:text="@string/action_refresh"
+                            android:layout_marginEnd="6dp" />
+                        <Button android:id="@+id/btn_verify_audit" style="@style/WdButton"
+                            android:layout_width="0dp" android:layout_weight="1.6"
+                            android:layout_height="wrap_content" android:text="@string/action_audit_verify"
+                            android:layout_marginEnd="6dp" />
+                        <Button android:id="@+id/btn_logout" style="@style/WdButton"
+                            android:layout_width="0dp" android:layout_weight="1"
+                            android:layout_height="wrap_content" android:text="@string/action_logout" />
+                    </LinearLayout>
+                    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:orientation="horizontal" android:paddingBottom="10dp">
+                        <Button android:id="@+id/btn_stop" style="@style/WdButtonDanger"
+                            android:layout_width="0dp" android:layout_weight="1"
+                            android:layout_height="wrap_content" android:text="@string/action_stop"
+                            android:layout_marginEnd="6dp" />
+                        <Button android:id="@+id/btn_clear_stop" style="@style/WdButton"
+                            android:layout_width="0dp" android:layout_weight="1"
+                            android:layout_height="wrap_content" android:text="@string/action_clear_stop" />
+                    </LinearLayout>
+                    <TextView android:id="@+id/dash_body" style="@style/WdMono"
+                        android:layout_width="match_parent" android:layout_height="wrap_content" />
+                </LinearLayout>
+            </ScrollView>
+
+            <!-- SCOPE -->
+            <ScrollView android:id="@+id/view_scope"
+                android:layout_width="match_parent" android:layout_height="match_parent"
+                android:padding="14dp" android:visibility="gone">
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:orientation="vertical">
+                    <TextView style="@style/WdH2" android:layout_width="wrap_content"
+                        android:layout_height="wrap_content" android:text="Scope Registry" />
+                    <TextView style="@style/WdBody" android:layout_width="match_parent"
+                        android:layout_height="wrap_content" android:text="@string/hint_authorization"
+                        android:textColor="@color/muted" android:paddingBottom="10dp" />
+                    <EditText android:id="@+id/in_scope" style="@style/WdInput"
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:hint="example.com or 10.0.0.0/24" />
+                    <Button android:id="@+id/btn_add_scope" style="@style/WdButtonPrimary"
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:text="@string/action_add_scope" android:layout_marginTop="10dp" />
+                    <TextView android:id="@+id/scope_body" style="@style/WdMono"
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:paddingTop="12dp" />
+                </LinearLayout>
+            </ScrollView>
+
+            <!-- ASSESS -->
+            <ScrollView android:id="@+id/view_assess"
+                android:layout_width="match_parent" android:layout_height="match_parent"
+                android:padding="14dp" android:visibility="gone">
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:orientation="vertical">
+                    <TextView style="@style/WdH2" android:layout_width="wrap_content"
+                        android:layout_height="wrap_content" android:text="New Assessment" />
+
+                    <TextView style="@style/WdLabel" android:layout_width="wrap_content"
+                        android:layout_height="wrap_content" android:text="TEMPLATE" />
+                    <Spinner android:id="@+id/sp_template"
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:background="@drawable/bg_input"
+                        android:minHeight="46dp" />
+
+                    <TextView style="@style/WdLabel" android:layout_width="wrap_content"
+                        android:layout_height="wrap_content" android:text="TARGETS (comma separated)"
+                        android:paddingTop="10dp" />
+                    <EditText android:id="@+id/in_targets" style="@style/WdInput"
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:hint="example.com" android:inputType="textNoSuggestions" />
+
+                    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:orientation="horizontal" android:paddingTop="10dp">
+                        <LinearLayout android:layout_width="0dp" android:layout_weight="1"
+                            android:layout_height="wrap_content" android:orientation="vertical"
+                            android:layout_marginEnd="8dp">
+                            <TextView style="@style/WdLabel" android:layout_width="wrap_content"
+                                android:layout_height="wrap_content" android:text="MODE" />
+                            <Spinner android:id="@+id/sp_mode"
+                                android:layout_width="match_parent" android:layout_height="wrap_content"
+                                android:background="@drawable/bg_input" android:minHeight="46dp" />
+                        </LinearLayout>
+                        <LinearLayout android:layout_width="0dp" android:layout_weight="1"
+                            android:layout_height="wrap_content" android:orientation="vertical">
+                            <TextView style="@style/WdLabel" android:layout_width="wrap_content"
+                                android:layout_height="wrap_content" android:text="INTENSITY" />
+                            <Spinner android:id="@+id/sp_intensity"
+                                android:layout_width="match_parent" android:layout_height="wrap_content"
+                                android:background="@drawable/bg_input" android:minHeight="46dp" />
+                        </LinearLayout>
+                    </LinearLayout>
+
+                    <Button android:id="@+id/btn_validate" style="@style/WdButton"
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:text="@string/action_validate" android:layout_marginTop="12dp" />
+                    <Button android:id="@+id/btn_run" style="@style/WdButtonPrimary"
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:text="@string/action_authorize_run" android:layout_marginTop="8dp" />
+
+                    <TextView android:id="@+id/assess_body" style="@style/WdMono"
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:paddingTop="12dp" />
+                </LinearLayout>
+            </ScrollView>
+
+            <!-- FINDINGS -->
+            <ScrollView android:id="@+id/view_findings"
+                android:layout_width="match_parent" android:layout_height="match_parent"
+                android:padding="14dp" android:visibility="gone">
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:orientation="vertical">
+                    <TextView style="@style/WdH2" android:layout_width="wrap_content"
+                        android:layout_height="wrap_content" android:text="Findings" />
+                    <Button android:id="@+id/btn_load_findings" style="@style/WdButton"
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:text="@string/action_load" />
+                    <TextView android:id="@+id/findings_body" style="@style/WdMono"
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:paddingTop="12dp" />
+                </LinearLayout>
+            </ScrollView>
+
+            <!-- REPORTS -->
+            <ScrollView android:id="@+id/view_reports"
+                android:layout_width="match_parent" android:layout_height="match_parent"
+                android:padding="14dp" android:visibility="gone">
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:orientation="vertical">
+                    <TextView style="@style/WdH2" android:layout_width="wrap_content"
+                        android:layout_height="wrap_content" android:text="Reports" />
+                    <TextView style="@style/WdLabel" android:layout_width="wrap_content"
+                        android:layout_height="wrap_content" android:text="LANGUAGE" />
+                    <Spinner android:id="@+id/sp_lang"
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:background="@drawable/bg_input" android:minHeight="46dp" />
+                    <Button android:id="@+id/btn_open_pdf" style="@style/WdButtonPrimary"
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:text="@string/action_open_pdf" android:layout_marginTop="10dp" />
+                    <Button android:id="@+id/btn_share_pdf" style="@style/WdButton"
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:text="@string/action_share_pdf" android:layout_marginTop="8dp" />
+                    <TextView android:id="@+id/reports_body" style="@style/WdMono"
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:paddingTop="12dp" />
+                </LinearLayout>
+            </ScrollView>
+
+            <!-- ARTAX -->
+            <ScrollView android:id="@+id/view_artax"
+                android:layout_width="match_parent" android:layout_height="match_parent"
+                android:padding="14dp" android:visibility="gone">
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:orientation="vertical">
+                    <TextView style="@style/WdH2" android:layout_width="wrap_content"
+                        android:layout_height="wrap_content" android:text="Artax AI" />
+                    <TextView android:id="@+id/artax_mode" style="@style/WdLabel"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="" />
+                    <EditText android:id="@+id/in_artax" style="@style/WdInput"
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:hint="ask about the selected assessment"
+                        android:inputType="textMultiLine" android:minLines="2" />
+                    <Button android:id="@+id/btn_ask" style="@style/WdButtonPrimary"
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:text="@string/action_ask" android:layout_marginTop="10dp" />
+                    <TextView android:id="@+id/artax_body" style="@style/WdBody"
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:paddingTop="12dp" android:textColor="#B7C7D6" />
+                </LinearLayout>
+            </ScrollView>
+        </FrameLayout>
+    </LinearLayout>
+</FrameLayout>

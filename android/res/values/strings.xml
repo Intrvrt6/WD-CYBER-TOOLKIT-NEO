@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- WD NEO palette: the same dark terminal colours as the web console -->
+    <color name="bg">#070B10</color>
+    <color name="bg2">#0B1118</color>
+    <color name="panel">#0E151D</color>
+    <color name="line">#1D2937</color>
+    <color name="line2">#243446</color>
+    <color name="text">#D7E3EE</color>
+    <color name="muted">#7E8FA3</color>
+    <color name="dim">#5B6B7D</color>
+    <color name="accent">#2DD4BF</color>
+    <color name="accent2">#38BDF8</color>
+    <color name="warn">#F59E0B</color>
+    <color name="bad">#EF4444</color>
+    <color name="ok">#22C55E</color>
+    <color name="crit">#DC2626</color>
+
+    <string name="app_name">WD NEO</string>
+    <string name="tagline">Cyber Toolkit NEO</string>
+
+    <!-- login -->
+    <string name="stage1_hint">Stage 1 — WD shortcut + credentials</string>
+    <string name="stage2_hint">Stage 2 — separate PIN</string>
+    <string name="label_server">SERVER URL</string>
+    <string name="label_username">OPERATOR</string>
+    <string name="label_password">PASSWORD</string>
+    <string name="label_shortcut">WD SHORTCUT CODE</string>
+    <string name="label_pin">STAGE-2 PIN</string>
+    <string name="action_verify_stage1">VERIFY STAGE 1</string>
+    <string name="action_verify_stage2">AUTHORIZE SESSION</string>
+    <string name="action_back">BACK</string>
+    <string name="action_connect">TEST CONNECTION</string>
+    <string name="action_rotate">ROTATE PASSWORD</string>
+
+    <!-- tabs -->
+    <string name="tab_dashboard">Dashboard</string>
+    <string name="tab_assess">Assess</string>
+    <string name="tab_scope">Scope</string>
+    <string name="tab_findings">Findings</string>
+    <string name="tab_reports">Reports</string>
+    <string name="tab_artax">Artax</string>
+
+    <!-- actions -->
+    <string name="action_refresh">REFRESH</string>
+    <string name="action_logout">LOGOUT</string>
+    <string name="action_stop">EMERGENCY STOP</string>
+    <string name="action_clear_stop">CLEAR STOP</string>
+    <string name="action_add_scope">ADD TARGET</string>
+    <string name="action_validate">VALIDATE SCOPE</string>
+    <string name="action_authorize_run">AUTHORIZE &amp; EXECUTE</string>
+    <string name="action_load">LOAD</string>
+    <string name="action_open_pdf">OPEN PDF</string>
+    <string name="action_share_pdf">SHARE</string>
+    <string name="action_ask">ASK ARTAX</string>
+    <string name="action_audit_verify">VERIFY AUDIT CHAIN</string>
+
+    <!-- states -->
+    <string name="msg_checking">checking server…</string>
+    <string name="msg_offline">server unreachable — check the URL and that the console is running</string>
+    <string name="msg_stage1_ok">Stage 1 accepted. Enter the stage-2 PIN.</string>
+    <string name="msg_executing">executing…</string>
+    <string name="msg_no_scope">Scope registry is empty. Add the targets you are authorized to test.</string>
+    <string name="msg_stop_active">EMERGENCY STOP ACTIVE</string>
+    <string name="hint_authorization">Only registered targets may be tested. The platform re-checks scope before every run.</string>
+</resources>

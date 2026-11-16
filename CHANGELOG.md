@@ -3,6 +3,50 @@
 All notable changes to WD CYBER TOOLKIT NEO. Versions follow the application's own
 `APP_VERSION` in `backend/config.py`.
 
+## 1.3.0 — 2026-11-16
+
+Engine-layer correctness release plus the native Android client. Every item below was reproduced on
+this host before the fix and is locked by a named test afterwards.
+
+### Added
+
+- **Native Android client (`android/`)** — a dependency-free app for the whole API: two-stage
+  unlock, dashboard, assess, scope, findings, all six report formats, Artax and audit-chain
+  verification. No Gradle, no Jetpack, no network at build time; `build_apk.sh` drives the SDK
+  build tools directly and produces a signed, zipaligned `dist/wd-neo.apk`.
+- **`android/prepare_sdk.sh`** — fetches build-tools, the platform jar and a released R8, so the
+  APK can be rebuilt on a clean host.
+- **`android/run_harness.sh`** — compiles the *same* `Json`/`HttpClient`/`WdApi` sources that are
+  packaged into the APK and drives the real HTTP API (29 checks), which tests the client contract
+  without an emulator.
+- **`docs/AUDIT_v1.3.0.md`** — the audit record for the engine-layer work in this release.
+
+### Fixed
+
+- **An executed check was reported as "not executed" (`automotive_can`).** `CAN-05` (anomaly
+  detection) ran and produced five failing findings, but section 4 of the report printed
+  `- [ ] CAN-05 - Not executed` and `8 of 9 declared check(s) executed; 1 could not run` — beside
+  its own findings. The parent/suffix rule was `check_id.rstrip("0123456789") == declared_id`, which
+  can never match an alphabetic suffix, so a check that emitted only derived ids (`CAN-05a`..`CAN-05e`)
+  was declared missing. Coverage under-reported exactly where the platform promises never to
+  misreport; `summary.coverage.missing` carried the same error.
+- **Coverage accounting is now one shared rule (`backend/coverage.py`).** The orchestrator roll-up,
+  the `unavailable_checks` mapping and the report renderer all resolve a produced id to its declared
+  parent through the same helper, so they cannot disagree. A derived id must start with a letter and
+  be at most three characters, which keeps `CAN-10` from being read as a variant of `CAN-1`.
+- **`database/schema.sql`** gains the `findings.status` column the ORM already wrote, so a database
+  provisioned from the reference DDL no longer fails with "no such column".
+- **The APK build was broken on this toolchain.** The `d8` inside `build-tools;android-14` is an
+  R8 8.2.2-dev snapshot that dies with `NullPointerException: Cannot invoke "String.length()"` on
+  *any* anonymous inner class — reproduced with a two-line stand-in class, so it was the tool and
+  not the app. `build_apk.sh` now uses a released R8 from Google's Maven repository when present.
+
+### Tests
+
+- `tests/test_coverage_accounting.py` — 11 tests: the derived-id rule (`CAN-05a`, `CAN-06b`,
+  `NET-02b`), the `CAN-1`/`CAN-10` counter-example, the orchestrator roll-up, and an end-to-end
+  report assertion that an executed check never renders as unreached.
+
 ## 1.2.1 — 2026-11-16
 
 Second security release, from the same adversarial review's remaining findings. All six were live
@@ -39,7 +83,7 @@ at `1.2.0`; each is covered by `tests/test_review_second_pass.py` and re-proved 
 
 - `APP_VERSION` is `1.2.1`; `docs/SECURITY.md` documents semantic scope matching, the audit anchor
   and its limits, the viewer role's actual capability, and session revocation on credential change.
-- Test suite: 186 collected tests (168 test functions, parametrised).
+- Test suite: 186 collected tests (168 test functions, parametrised) at 1.2.1; 197 at 1.3.0.
 
 ## 1.2.0 — 2026-11-16
 

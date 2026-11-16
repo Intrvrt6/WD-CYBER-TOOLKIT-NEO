@@ -92,6 +92,7 @@ CREATE TABLE IF NOT EXISTS findings (
   assessment_id   VARCHAR(32) NOT NULL REFERENCES assessments(id),
   title           VARCHAR(255) NOT NULL,
   severity        VARCHAR(16) DEFAULT 'info',
+  status          VARCHAR(16) DEFAULT 'info',   -- pass|fail|info|unavailable|error
   description     TEXT DEFAULT '',
   evidence_source VARCHAR(24) DEFAULT 'live',   -- live|lab|local|unavailable
   cvss_score      FLOAT,

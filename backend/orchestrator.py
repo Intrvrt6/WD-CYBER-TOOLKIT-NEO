@@ -9,7 +9,8 @@ from typing import Any
 
 from sqlalchemy import select
 
-from backend import audit, authorization, config, emergency_stop, runner, templates_registry
+from backend import (audit, authorization, config, coverage, emergency_stop, runner,
+                     templates_registry)
 from backend.database import (
     Artifact, Assessment, Finding, Job, SessionLocal, User, utcnow,
 )
@@ -236,23 +237,26 @@ def _run_job(job_id: str, assessment_id: str) -> None:
 def _declared_reported(engine, results: list[Result]) -> list[str]:
     """Which DECLARED checks produced at least one result.
 
-    Engines may emit conditional sub-findings with derived ids (e.g. NET-02b) that
-    belong to a parent check. Coverage must be measured against the declared
-    checklist, otherwise a module could appear to cover 10/8 checks.
+    Engines may emit conditional sub-findings with derived ids (e.g. NET-02b,
+    CAN-05a..CAN-05e) that belong to a parent check. Coverage must be measured
+    against the declared checklist, otherwise a module could appear to cover
+    10/8 checks. The parent/suffix rule lives in backend.coverage so the report
+    and this roll-up cannot disagree.
     """
     declared = [c[0] for c in engine.checks]
-    produced = {str(r.check_id) for r in results}
-    return [cid for cid in declared if cid in produced or any(
-        cid_ == cid or cid_.startswith(cid + "-") or cid_.rstrip("0123456789") == cid
-        for cid_ in produced)]
+    return coverage.declared_reported(declared, [str(r.check_id) for r in results])
 
 
 def _coverage(engine, results: list[Result]) -> dict:
     """Declared-checklist coverage and the reason any declared check is missing."""
     declared = [c[0] for c in engine.checks]
-    reported = _declared_reported(engine, results)
-    missing = [cid for cid in declared if cid not in reported]
-    unavailable = sorted({r.check_id for r in results if r.status == "unavailable"})
+    produced = [str(r.check_id) for r in results]
+    reported = coverage.declared_reported(declared, produced)
+    missing = coverage.declared_missing(declared, produced)
+    # Unavailable checks are reported against their DECLARED id, so a derived id
+    # (CAN-05a) that could not run still marks CAN-05 as not executed.
+    unavailable = sorted({coverage.strip_suffix(str(r.check_id), declared)
+                          for r in results if r.status == "unavailable"})
     return {
         "declared": len(declared),
         "reported": len(reported),

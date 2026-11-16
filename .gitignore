@@ -27,3 +27,10 @@ database/nuclei_*.jsonl
 # local run dirs created by helper scripts
 .run/
 ui-proof*/\.run/
+
+# Android client build output. `dist/` is kept so the installable APK ships with
+# the repo; `build/` and the generated release keystore are reproducible state.
+android/build/
+android/keystore/
+android/dist/*.idsig
+android/javac.*.args

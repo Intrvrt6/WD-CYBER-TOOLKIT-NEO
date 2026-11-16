@@ -22,6 +22,7 @@ from reportlab.platypus import (KeepTogether, PageBreak, Paragraph, SimpleDocTem
 from sqlalchemy import select
 
 from backend import config
+from backend import coverage
 from backend.database import Artifact, Assessment, Finding
 
 I18N: dict[str, dict[str, str]] = {
@@ -83,11 +84,20 @@ def build_report_data(db, assessment_id: str, lang: str = "en") -> dict[str, Any
     sev_rank = {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}
     ordered = sorted(findings, key=lambda f: (sev_rank.get(f.severity, 9), f.check_id))
     summary = a.summary or {}
+    expected = summary.get("checks_expected") or []
+    # Reconcile stored coverage against the findings actually rendered. The stored
+    # summary is a snapshot taken at run time; if it ever under-reports an executed
+    # check (e.g. a check that only emitted derived ids), the report would print
+    # "[ ] not executed" beside that check's own findings. Measure against both.
+    stored_reported = summary.get("checks_reported") or []
+    executed_ids = [f.check_id for f in ordered if f.check_id]
+    reported = list(dict.fromkeys(list(stored_reported)
+                                  + coverage.declared_reported(expected, executed_ids)))
     return {
         "assessment": a, "findings": ordered, "artifacts": arts, "lang": lang,
         "tools": tools, "summary": summary,
-        "expected": summary.get("checks_expected") or [],
-        "reported": summary.get("checks_reported") or [],
+        "expected": expected,
+        "reported": reported,
         "unavailable": (summary.get("coverage") or {}).get("unavailable_checks") or [],
         "unavailable_reasons": {f.check_id: f.description for f in ordered
                                 if f.status == "unavailable" and f.check_id},
