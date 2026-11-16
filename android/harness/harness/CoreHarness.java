@@ -19,6 +19,9 @@ import sh.testssl.wdneo.core.WdApi;
  */
 public final class CoreHarness {
 
+    /** Deterministic post-bootstrap password so repeated runs stay idempotent. */
+    private static final String HARNESS_PASSWORD = "Harness-Rotated-Pass-2026";
+
     private static int passed = 0;
     private static int failed = 0;
 
@@ -79,15 +82,27 @@ public final class CoreHarness {
 
         // ---- 3. two-stage login ----
         // A previously rotated install rejects the bootstrap password. Resolve the
-        // working one once so the harness can be re-run against the same database.
+        // working one so the harness can be re-run against the same database.
+        // The password is rotated by this harness on the first run, so try the
+        // bootstrap value and then the rotated forms in order (bounded, so a
+        // genuinely wrong password still fails fast).
         String effectivePass = pass;
-        try {
-            api.stage1(user, pass, shortcut);
-        } catch (HttpClient.ApiException e) {
-            if (e.status != 401) throw e;
-            effectivePass = "Rotated-" + pass;
-            api.stage1(user, effectivePass, shortcut);
+        String[] candidates = { pass, HARNESS_PASSWORD, "Rotated-" + pass,
+                                "Rotated2-" + pass };
+        HttpClient.ApiException lastErr = null;
+        boolean ok = false;
+        for (String candidate : candidates) {
+            try {
+                api.stage1(user, candidate, shortcut);
+                effectivePass = candidate;
+                ok = true;
+                break;
+            } catch (HttpClient.ApiException e) {
+                lastErr = e;
+                if (e.status != 401) throw e;
+            }
         }
+        if (!ok) throw lastErr;
         final String pw = effectivePass;
 
         check("stage 1 returns a token", () -> {
@@ -119,7 +134,10 @@ public final class CoreHarness {
             Map<String, Object> me = api.me();
             boolean must = Json.bool(Json.obj(me, "user"), "must_change_password");
             if (must) {
-                api.changePassword(pw, "Rotated2-" + pw);
+                // Rotate to a FIXED value, not a prefix of the current one: a
+                // prefix would grow on every harness run (Rotated-, Rotated2-...)
+                // and the next run could no longer guess the password.
+                api.changePassword(pw, HARNESS_PASSWORD);
                 Map<String, Object> after = api.me();
                 expect(!Json.bool(Json.obj(after, "user"), "must_change_password"),
                        "flag should clear after rotation");

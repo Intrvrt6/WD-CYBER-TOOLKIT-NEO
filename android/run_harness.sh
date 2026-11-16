@@ -11,6 +11,16 @@ cd "$HERE"
 BASE="${1:-http://127.0.0.1:8000}"
 CREDS="${CREDS_FILE:-/tmp/creds.json}"
 
+# Derive credentials from the backend bootstrap file unless one was supplied.
+# The bootstrap password is rotated on first login, so try the bootstrap value
+# and the forms this harness rotates into, in order.
+# Always refresh when we can read the bootstrap file: the stored /tmp file may
+# hold a password the backend has since rotated.
+if [ -z "${CREDS_FILE:-}" ] && [ -f ../database/bootstrap_credentials.txt ]; then
+  python3 refresh_creds.py "$BASE" \
+    ../database/bootstrap_credentials.txt "$CREDS" || true
+fi
+
 [ -f "$CREDS" ] || { echo "missing credentials file: $CREDS" >&2; exit 1; }
 
 mapfile -t FIELDS < <(python3 - "$CREDS" <<'PY'
