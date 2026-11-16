@@ -34,8 +34,11 @@ private/
 
 # --- Android client ---------------------------------------------------------
 # `dist/` is committed so the installable APK ships with the repo.
-# `build/`, the generated release keystore and javac argfiles are reproducible.
+# `keystore/wd-neo.jks` is ALSO committed on purpose: the signing key must be
+# stable, otherwise every rebuild produces a different certificate and
+# `adb install -r` fails with INSTALL_FAILED_UPDATE_INCOMPATIBLE. It is a
+# release keystore with a documented passphrase, not a secret.
+# `build/` is reproducible state.
 android/build/
-android/keystore/
 android/dist/*.idsig
 android/javac.*.args

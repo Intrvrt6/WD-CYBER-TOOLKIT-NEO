@@ -120,18 +120,28 @@ echo "alignment verified"
 
 # ----------------------------------------------------------------- 7. sign ---
 log "7/7 sign"
-if [ ! -f keystore/wd-neo.jks ]; then
-  mkdir -p keystore
-  keytool -genkeypair -keystore keystore/wd-neo.jks -alias wdneo \
+# The signing key decides the app IDENTITY: a different key means Android
+# refuses the update (INSTALL_FAILED_UPDATE_INCOMPATIBLE). So the default
+# keystore is committed, and callers can override it with WD_KEYSTORE /
+# WD_STOREPASS / WD_KEYPASS to sign with their own.
+KEYSTORE="${WD_KEYSTORE:-keystore/wd-neo.jks}"
+STOREPASS="${WD_STOREPASS:-wdneo-release}"
+KEYPASS="${WD_KEYPASS:-$STOREPASS}"
+KEYALIAS="${WD_KEYALIAS:-wdneo}"
+if [ ! -f "$KEYSTORE" ]; then
+  mkdir -p "$(dirname "$KEYSTORE")"
+  keytool -genkeypair -keystore "$KEYSTORE" -alias "$KEYALIAS" \
     -keyalg RSA -keysize 2048 -validity 10950 \
-    -storepass wdneo-release -keypass wdneo-release \
+    -storepass "$STOREPASS" -keypass "$KEYPASS" \
     -dname 'CN=WD Cyber Toolkit NEO, OU=Security Engineering, O=WD, L=Jakarta, C=ID'
-  echo "generated release keystore keystore/wd-neo.jks"
+  echo "generated release keystore $KEYSTORE"
 fi
+echo "keystore    : $KEYSTORE (alias $KEYALIAS)"
 "$BT/apksigner" sign \
-  --ks keystore/wd-neo.jks \
-  --ks-pass pass:wdneo-release \
-  --key-pass pass:wdneo-release \
+  --ks "$KEYSTORE" \
+  --ks-key-alias "$KEYALIAS" \
+  --ks-pass pass:"$STOREPASS" \
+  --key-pass pass:"$KEYPASS" \
   --min-sdk-version "$MIN_SDK" \
   --out dist/wd-neo.apk \
   build/aligned.apk
