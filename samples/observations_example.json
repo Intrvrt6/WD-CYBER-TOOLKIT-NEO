@@ -1,0 +1,56 @@
+{
+  "AC-01": {
+    "answer": "pass",
+    "note": "Card reader observed active at the main entrance",
+    "evidence_ref": "photos/ac01-reader.jpg",
+    "observed_by": "assessor-1",
+    "observed_at": "2026-11-14T09:10:00Z"
+  },
+  "AC-02": {
+    "answer": "fail",
+    "note": "Server room door propped open with a chair on arrival",
+    "evidence_ref": "photos/ac02-door.jpg",
+    "observed_by": "assessor-1",
+    "observed_at": "2026-11-14T09:22:00Z"
+  },
+  "AC-03": {
+    "answer": "pass",
+    "note": "Notice posted beside the entrance",
+    "evidence_ref": "photos/ac03-notice.jpg",
+    "observed_by": "assessor-1",
+    "observed_at": "2026-11-14T09:25:00Z"
+  },
+  "CV-01": {
+    "answer": "pass",
+    "note": "Lobby camera view verified live at the NVR console",
+    "evidence_ref": "nvr/still-cv01.png",
+    "observed_by": "assessor-1",
+    "observed_at": "2026-11-14T09:40:00Z"
+  },
+  "CV-02": {
+    "answer": "fail",
+    "note": "NVR retention configured to 14 days, policy requires 30",
+    "evidence_ref": "nvr/retention-setting.png",
+    "observed_by": "assessor-1",
+    "observed_at": "2026-11-14T09:44:00Z"
+  },
+  "VM-01": {
+    "answer": "pass",
+    "note": "Visitor log present and current for the week",
+    "evidence_ref": "visitor/log-week45.pdf",
+    "observed_by": "assessor-2",
+    "observed_at": "2026-11-14T10:05:00Z"
+  },
+  "VM-02": {
+    "answer": "na",
+    "note": "Site uses a turnstile with single-use QR passes; badges not issued",
+    "observed_by": "assessor-2"
+  },
+  "TE-01": {
+    "answer": "fail",
+    "note": "Comms cabinet had no seal fitted; latch intact but unsealed",
+    "evidence_ref": "photos/te01-cabinet.jpg",
+    "observed_by": "assessor-1",
+    "observed_at": "2026-11-14T10:20:00Z"
+  }
+}

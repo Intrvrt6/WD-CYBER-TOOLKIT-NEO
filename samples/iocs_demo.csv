@@ -1,0 +1,6 @@
+type,value,note
+ip,203.0.113.45,known C2 sample (TEST-NET-3 documentation range)
+domain,darkgate-update.example,typosquat style C2 domain
+domain,xj3k9q2m7vz1q8w4.example,DGA-style label for entropy heuristic
+sha256,ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad,sha256 of the ASCII text abc
+url,https://203.0.113.45:8443/gate.php,beacon URL sample

@@ -1,0 +1,63 @@
+===== ENGINE 2/4: social_engineering (live DNS example.com) =====
+=== social_engineering: Module G - Social Engineering ===
+checks declared: 6  -> SOC-01, SOC-02, SOC-03, SOC-04, SOC-05, SOC-06
+results returned: 8  evidence_dir: /workspace/tasks/d7fa18a5-a7d6-4e74-bea4-a0dc525555bc/workstreams/89f666b8-2409-4472-8494-2213ff41d280/evidence/run-social_engineering
+
+[SOC-01] INFO sev=info source=live cvss=None asset=example.com
+    title: Email authentication records for example.com
+    Live DNS lookups for example.com: SPF=present, DMARC=present, DKIM selectors with a record=none, MX=present. SPF mechanisms=1, all-qualifier=-all.
+    evidence[command_output]: dig +short TXT example.com
+    evidence[command_output]: dig +short TXT _dmarc.example.com
+    evidence[command_output]: dig +short TXT default._domainkey.example.com
+
+[SOC-01g] INFO sev=low source=live cvss=None asset=example.com
+    title: DKIM selector probes answered by a wildcard placeholder
+    Every probed selector at <selector>._domainkey.example.com returned the same record 'v=DKIM1; p=', and the control probe
+    ctrl6fdf9bc762._domainkey.example.com (a random selector that cannot exist) returned it too, so the zone serves a wildcard placeholder. Per RFC 6376
+    an empty p= means no key, so no usable DKIM key was observed; the selector hits are not real published keys.
+    remediation: Publish a real selector with a 2048-bit p= key, and remove the wildcard placeholder so probes are unambiguous.
+    evidence[other]: control probe
+
+[SOC-02] INFO sev=info source=live cvss=None asset=example.com
+    title: Email security scoring
+    Scored 1 domain(s) with the stated rubric: example.com=75/100 (grade C). Weakest: example.com.
+    evidence[other]: score breakdown
+
+[SOC-03] INFO sev=info source=lab cvss=None asset=Example Corp
+    title: Phishing awareness template rendering (authorized campaigns)
+    Rendered 2 HTML awareness templates with 10 substituted fields and saved them as evidence. These are AUTHORIZED-campaign artefacts only: the rendered
+    files carry an authorization banner and must not be delivered outside a written engagement (authorization reference: ENG-2026-014).
+    evidence[None]: None
+    evidence[None]: None
+    evidence[other]: substituted fields
+
+[SOC-04] INFO sev=info source=lab cvss=None asset=Example Corp
+    title: Landing-page template generation (non-collecting)
+    Generated a real HTML landing page fixture and saved it to evidence. It contains no form action, no network call and no storage: the submit handler is
+    cancelled in-page, so it collects nothing by default. It teaches the 'pause and verify' message and points at the internal reporting channel.
+    evidence[None]: None
+    evidence[other]: non-collection design
+
+[SOC-05] INFO sev=info source=live cvss=None asset=campaign_results.csv
+    title: Awareness reporting metrics
+    Computed real metrics from campaign_results.csv: 10 recipient row(s); open_rate=60.00%, click_rate=40.00%, submit_rate=10.00%, report_rate=20.00%.
+    evidence[None]: None
+    evidence[file]: campaign results input
+
+[SOC-06] INFO sev=info source=live cvss=None asset=example.com
+    title: Lookalike domain detection for example.com
+    Generated 30 stated permutations of example.com (['adjacent-transposition', 'character-omission', 'homoglyph-substitution', 'hyphenation', 'keyword-
+    prefix', 'keyword-suffix', 'label-duplication', 'tld-duplication', 'tld-substitution']) and resolved each with dig: 17 resolve to an A record, 12 of
+    those also publish MX. Registration ownership is NOT verified here.
+    evidence[None]: None
+    evidence[other]: resolved lookalikes
+
+[SOC-06b] INFO sev=low source=live cvss=None asset=example.com
+    title: Lookalike domains of the assessed brand resolve
+    17 permutation(s) of example.com currently resolve, e.g. eaxmple.com (adjacent-transposition -> 202.181.103.212,157.7.236.66, MX), exampe.com
+    (character-omission -> 162.4.84.215, MX), exampel.com (adjacent-transposition -> 192.64.151.235, MX), exampl.com (character-omission ->
+    199.191.50.184, MX), exampl3.com (homoglyph-substitution -> 200.69.18.139, MX), example.co (tld-substitution -> 104.21.39.76,172.67.143.199, MX),
+    example.net (tld-substitution -> 104.20.21.8,172.66.175.59, MX), example.org (tld-substitution -> 172.66.157.237,104.20.26.136, MX). Resolving does
+    not by itself prove malicious intent; each domain needs ownership/WHOIS review and brand monitoring enrollment.
+    remediation: Feed these permutations to brand-protection monitoring and consider defensive registration for the highest-risk ones.
+    evidence[other]: resolved permutations

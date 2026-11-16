@@ -1,0 +1,64 @@
+# WD CYBER TOOLKIT NEO — local stack with an optional PostgreSQL profile.
+#
+# SQLite (default, zero setup):
+#   docker compose up --build
+#
+# PostgreSQL instead of SQLite:
+#   docker compose --profile postgres up --build
+#   (the app container gets WD_DATABASE_URL pointing at the db service)
+
+services:
+  app:
+    build: .
+    image: wd-cyber-toolkit-neo:latest
+    container_name: wd-neo
+    ports:
+      - "${WD_PORT:-8000}:8000"
+    environment:
+      WD_INSTANCE_NAME: WD CYBER TOOLKIT NEO
+      WD_HOST: 0.0.0.0
+      WD_PORT: "8000"
+      # Set these to provision the operator explicitly instead of auto-generating.
+      # WD_ADMIN_USER: WD-OPERATOR-01
+      # WD_ADMIN_PASSWORD: Change-Me-Strong-1
+      # WD_ADMIN_PIN: "42424242"
+      # WD_SHORTCUT: WD-XXXXXXXXXXXXX
+      WD_DATABASE_URL: >-
+        ${WD_DATABASE_URL:-sqlite:////app/database/wd_cyber.db}
+    volumes:
+      - wd_database:/app/database
+      - wd_evidence:/app/evidence
+      - wd_reports:/app/reports
+    # NET_RAW is required for live packet capture (tcpdump/tshark) and arping.
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 25s
+
+  db:
+    image: postgres:16-alpine
+    container_name: wd-neo-db
+    profiles: ["postgres"]
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-wd_cyber}
+      POSTGRES_USER: ${POSTGRES_USER:-wd}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-wd_change_me}
+    volumes:
+      - wd_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-wd} -d ${POSTGRES_DB:-wd_cyber}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  wd_database:
+  wd_evidence:
+  wd_reports:
+  wd_pgdata:

@@ -1,0 +1,83 @@
+===== ENGINE 1/4: mobile_security (real F-Droid APK, binary AXML) =====
+=== mobile_security: Module F - Mobile & Zero-Click Security ===
+checks declared: 8  -> MOB-01, MOB-02, MOB-03, MOB-04, MOB-05, MOB-06, MOB-07, MOB-08
+results returned: 12  evidence_dir: /workspace/tasks/d7fa18a5-a7d6-4e74-bea4-a0dc525555bc/workstreams/89f666b8-2409-4472-8494-2213ff41d280/evidence/run-mobile_security
+
+[MOB-01] INFO sev=info source=live cvss=None asset=org.fdroid.fdroid.privileged
+    title: Application inventory
+    Inspected APK fdroid-privileged-2070.apk (37,062 bytes, sha256 429bde81414c8779...): package=org.fdroid.fdroid.privileged, versionName=0.2.7,
+    versionCode=2070.
+    evidence[other]: apk inventory
+    evidence[other]: host mobile facts
+
+[MOB-02] INFO sev=info source=live cvss=None asset=org.fdroid.fdroid.privileged
+    title: OS patch / platform version verification
+    Artifact declares minSdk=8 targetSdk=25. Host kernel 5.10.225 on Ubuntu 24.04.5 LTS; 30 package(s) upgradable from the security pocket (41 upgradable
+    in total).
+    remediation: Verify the device's real SPL (ro.build.version.security_patch) is current; the artifact targets API 25.
+    evidence[command_output]: apt-get -s upgrade
+
+[MOB-02b] FAIL sev=low source=local cvss=4.0 asset=40ee63fb68d9
+    title: Security-pocket updates pending on the analysis host
+    30 package(s) on this host resolve from a security pocket: libperl5.38t64, perl, perl-base, perl-modules-5.38, libc6-dev, libc-dev-bin, linux-libc-
+    dev, libc6, libc-bin, libapt-pkg6.0t64, apt, ca-certificates
+    remediation: Apply pending security updates on the host running the assessment.
+    evidence[command_output]: apt-get -s upgrade
+
+[MOB-03] INFO sev=info source=live cvss=None asset=org.fdroid.fdroid.privileged
+    title: Permission auditing
+    2 uses-permission declaration(s) parsed from the real manifest; 0 runtime-dangerous, 2 powerful; 0 custom permission(s) defined.
+    evidence[other]: permissions from manifest
+
+[MOB-03c] INFO sev=medium source=live cvss=None asset=org.fdroid.fdroid.privileged
+    title: Powerful permissions granted
+    android.permission.INSTALL_PACKAGES (silent APK installation (platform/privileged)); android.permission.DELETE_PACKAGES (silent APK removal
+    (platform/privileged))
+    remediation: Justify powerful permissions in the app's threat model; accessibility and overlay permissions are the main UI-hijack primitives.
+    evidence[other]: powerful permissions
+
+[MOB-04] INFO sev=info source=live cvss=None asset=org.fdroid.fdroid.privileged
+    title: Attack surface inventory
+    1 component(s) parsed; 1 explicitly exported; 0 deeplink route(s) across 0 scheme(s).
+    evidence[other]: components and routes
+
+[MOB-04b] FAIL sev=medium source=live cvss=5.3 asset=org.fdroid.fdroid.privileged
+    title: Exported components without a permission guard
+    1 exported component(s) declare no android:permission, so any installed app can invoke them: service org.fdroid.fdroid.privileged.PrivilegedService
+    remediation: Set android:exported=false or guard with a signature-level android:permission on every component that need not be public.
+    evidence[other]: exposed components
+
+[MOB-05] INFO sev=info source=local cvss=None asset=host-python
+    title: Dependency vulnerability checks
+    No params.dependency_file supplied. Enumerated 187 installed python distribution(s) on this host and compared them against the in-code table of 18
+    known-vulnerable ranges: 0 match(es).
+    evidence[other]: installed python distributions
+    evidence[other]: in-code vulnerability table
+
+[MOB-06] INFO sev=info source=live cvss=None asset=org.fdroid.fdroid.privileged
+    title: Known exploit exposure assessment
+    Observed targetSdkVersion=25. Applying the version-keyed exposure classes below (5 class(es) apply). These are derived exposure classes, not confirmed
+    exploits.
+    evidence[other]: targetSdk exposure map
+
+[MOB-06b] FAIL sev=medium source=live cvss=5.3 asset=org.fdroid.fdroid.privileged
+    title: Target SDK below current platform hardening baseline
+    targetSdkVersion=25 predates API 31; the following hardening is not enforced: Missing FLAG_IMMUTABLE/FLAG_MUTABLE enforcement for PendingIntent (API
+    31+: an implicit-mutable PendingIntent can be filled in by another app). No package-visibility filtering by default (API 30 also enforces scoped
+    storage and requires explicit <queries>). No enforced scoped storage; legacy all-files access remains possible on API 29 targets. Cleartext HTTP is
+    allowed by default (usesCleartextTraffic default true below API 28). No background-execution limits / implicit-broadcast restrictions introduced at
+    API 26.
+    remediation: Raise targetSdkVersion to the current platform API after retesting behaviour changes.
+    evidence[other]: applies
+
+[MOB-07] FAIL sev=medium source=live cvss=5.0 asset=org.fdroid.fdroid.privileged
+    title: Secure configuration auditing
+    7 configuration attribute(s) read from the real manifest; 1 non-secure: exported-without-permission.
+    remediation: Set allowBackup=false for secret-bearing apps, debug-gable=false in release, usesCleartextTraffic=false with a network security config,
+    and export only required components.
+    evidence[other]: manifest configuration attributes
+
+[MOB-08] INFO sev=info source=live cvss=None asset=org.fdroid.fdroid.privileged
+    title: Vulnerability prioritisation
+    Prioritised 4 failing/observable finding(s) by CVSS-ish score. 11 finding(s) derived from real observation, 0 check(s) unavailable.
+    evidence[other]: ranked findings

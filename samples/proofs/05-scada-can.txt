@@ -1,0 +1,39 @@
+===== Module C (SCADA/ICS) and Module D (Automotive/CAN) — verification =====
+Captured on the build host with both engines in lab mode.
+
+--- SCADA/ICS lab run: 10 results, 0 unavailable, all source=lab ---
+ICS-01 info info lab | 127.0.0.1:5020/tcp open (connect 0.03 ms); 127.0.0.1:4840/tcp open (connect 0.43 ms)
+ICS-02 pass info lab | Modbus/TCP confirmed by a real 0x03 response (00010000000b0103080014...)
+ICS-03 info info lab | Modbus units answering [1, 2, 247, 255] (serving data: [1, 2]...)
+ICS-04 fail high lab | Modbus/TCP answered unit 1 with no credential of any kind
+ICS-05 info info lab | All ICS endpoints resolve over loopback; no network boundary crossed
+ICS-06 info info lab | Read-only: 0x03 holding registers 0-3: [20, 21, ...]
+ICS-07 fail high lab | Correlated, not exploit-tested: Modbus/TCP has no authentication or session concept
+ICS-08 info high lab | Worst observed: high (CVSS 7.5) from ICS-04, ICS-07. IEC 62443 zone/conduit rationale
+ICS-09 info info lab | Saved 3 evidence artifacts: modbus_transcript.txt, opcua_endpoints.json, ics_probe_summary.json
+ICS-10 pass info lab | READ-ONLY operations only - no register, coil or node value was modified
+
+--- Automotive/CAN lab run: 14 results, 0 unavailable, all source=lab ---
+CAN-01 info info lab | Lab bus 'wdcan0': 6 simulated ECUs - ENGINE(0x100@10ms), TRANSMISSION(0x180@20ms)...
+CAN-02 info info lab | 6 distinct arbitration IDs observed in 703 real frames over 3.0s
+CAN-03 info info lab | 5 periodic, 1 event/bursty, 3 counter-bearing, 2 checksum-bearing (heuristic), 2 signal-bearing
+CAN-04 info info lab | Inter-arrival statistics for 6 IDs; 1 exceeds jitter threshold CV > 0.5
+CAN-05 fail medium lab | counter discontinuity (0x100: counter byte 0 jumped by 8)
+CAN-05 fail medium lab | period deviation (0x180: mean inter-arrival moved 13.45 ms -> 6 ms)
+CAN-05 fail low lab    | dlc change (0x2A0: DLC changed between [4, 8])
+CAN-05 fail low lab    | payload frozen (0x1F0: frozen for 14 consecutive frames)
+CAN-05 fail low lab    | late id (0x6A0: first frame only at 54.9% of the window)
+CAN-06 info info lab | 3 replay-friendly, 3 replay-resistant IDs. Lab replay performed: 0x2A0
+CAN-06 fail medium lab | 0x1F0, 0x2A0, 0x6A0 carry no counter/checksum -> recorded frame accepted on replay
+CAN-07 info info lab | 5/5 UDS requests answered on 0x7E0 -> 0x7E8 over hand-built ISO-TP
+CAN-08 fail medium lab | Protected DID 0xF123 refused with NRC 0x33 until SecurityAccess; 4-byte seed issued
+CAN-09 info info lab | Per-ID timeline (13 x 0.25s buckets) and ID x byte activity matrix for 6 IDs from 703 frames
+
+--- Repeatability ---
+scada_ics 10 results / automotive_can 14 results on two consecutive runs;
+ports 5020 and 4840 released afterwards; no leaked threads.
+
+--- Via the platform REST API (full two-stage auth + scope + authorization) ---
+SCADA/ICS: status completed, risk 7.5, findings 10, unavailable 0, sources {'lab': 10}
+CAN bus:   status completed, risk 4.08, findings 14, unavailable 0, sources {'lab': 14}
+audit chain: {"valid":true,"events":13}

@@ -1,0 +1,53 @@
+# Custom physical checklist supplied to PhysicalEngine via params.checklist_path
+version: "site-a-2026.2"
+items:
+  - id: AC-01
+    domain: access_control
+    control: Main entrance card reader
+    question: Does the main entrance require a valid card for entry?
+    expected_evidence: Photo of the reader plus one access log entry
+  - id: AC-02
+    domain: access_control
+    control: Server room door
+    question: Is the server room door self-closing and locked?
+    expected_evidence: Photo of door and door-closer
+  - id: AC-03
+    domain: access_control
+    control: Tailgating notice
+    question: Is an anti-tailgating notice posted at the entrance?
+    expected_evidence: Photo of the notice
+  - id: CV-01
+    domain: cctv
+    control: Lobby camera coverage
+    question: Does a camera cover the lobby entrance?
+    expected_evidence: Camera view still frame
+  - id: CV-02
+    domain: cctv
+    control: Retention window
+    question: Is footage retained for at least 30 days?
+    expected_evidence: NVR retention setting screenshot
+  - id: VM-01
+    domain: visitor_management
+    control: Visitor log
+    question: Are all visitors recorded in a log?
+    expected_evidence: Visitor log page for the last week
+  - id: VM-02
+    domain: visitor_management
+    control: Badge return
+    question: Are visitor badges collected on exit?
+    expected_evidence: Completed badge-return column
+  - id: TE-01
+    domain: tamper_evidence
+    control: Cabinet seals
+    question: Do comms cabinets carry serialised seals?
+    expected_evidence: Photo of a sealed cabinet with visible serial
+  - id: ID-01
+    domain: incident_documentation
+    control: Incident register
+    question: Is there a register of physical incidents?
+    expected_evidence: Register export with one closed incident
+  - id: ID-02
+    domain: incident_documentation
+    control: Exercise record
+    question: Was a physical security exercise run in the last 12 months?
+    expected_evidence: Exercise report with date and lessons learned

@@ -1,0 +1,49 @@
+===== ENGINE 4/4: hardware_security (sysfs + inventory + baseline) =====
+=== hardware_security: Module I - Hardware Security ===
+checks declared: 7  -> HW-01, HW-02, HW-03, HW-04, HW-05, HW-06, HW-07
+results returned: 7  evidence_dir: /workspace/tasks/d7fa18a5-a7d6-4e74-bea4-a0dc525555bc/workstreams/89f666b8-2409-4472-8494-2213ff41d280/evidence/run-hardware_security
+
+[HW-01] UNAVAILABLE sev=info source=unavailable cvss=None asset=40ee63fb68d9
+    title: USB inventory
+    No USB device could be enumerated on this host. Probed: /sys/bus/usb/devices present=False, /dev/bus/usb present=False, lsusb installed=False.
+    Environment: virtual-machine (kvm) (no container marker); /sys/firmware entries=['memmap'], DMI table present=False, PCI bus present=False. USB
+    inventory therefore requires a host with a USB controller exposed (bare metal, or a VM with USB passthrough).
+    evidence[other]: USB enumeration sources probed
+
+[HW-02] INFO sev=info source=local cvss=None asset=40ee63fb68d9
+    title: Peripheral identification
+    Peripheral sources that yielded data: pci=0, input=0, block=10, net=3. Sources with no data on this host: pci_sysfs, lspci, input_sysfs.
+    evidence[other]: peripheral inventory
+
+[HW-03] PASS sev=info source=local cvss=None asset=40ee63fb68d9
+    title: Firmware integrity assessment
+    Compared 2 baseline firmware file hash(es) against the live host: 2 match, 0 differ, 0 unavailable. Firmware matches the supplied baseline.
+    remediation: No action required: the observed firmware matches the supplied baseline.
+    evidence[other]: baseline comparison
+
+[HW-04] INFO sev=info source=local cvss=None asset=40ee63fb68d9
+    title: Device inventory
+    Aggregate host inventory: 2 logical CPU(s) (Intel(R) Xeon(R) Processor), 3.9 GiB RAM, 10 block device(s) / 3 mounted partition(s), 3 network
+    interface(s), 0 USB device(s), 0 PCI device(s). Platform: Linux-5.10.225-x86_64-with-glibc2.39.
+    evidence[other]: aggregate inventory
+
+[HW-05] INFO sev=low source=local cvss=None asset=40ee63fb68d9
+    title: Hardware anomaly detection
+    Applied 5 stated heuristics; 2 match(es) observed (0 at medium/high severity). Matches: locally-administered-mac on docker0; locally-administered-mac
+    on eth0.
+    remediation: Review each low-severity match with the hardware owner; locally-administered MACs are normal on virtual/bridge interfaces, so they are
+    reported for verification, not as findings. Re-run on the physical host for USB/PCI/SMART coverage.
+    evidence[other]: anomaly heuristics applied
+
+[HW-06] PASS sev=info source=local cvss=None asset=40ee63fb68d9
+    title: Unauthorized device detection
+    Diffed 2 observed device identifier(s) against 0 allowed key(s) and 2 allowed serial(s): 2 authorised, 0 not in the authorised inventory.
+    remediation: No unlisted device observed; refresh the authorised inventory at each hardware change.
+    evidence[other]: authorised-inventory diff
+
+[HW-07] INFO sev=info source=local cvss=None asset=40ee63fb68d9
+    title: Tamper evidence inspection
+    8 tamper-relevant item(s): 1 host-observable, 7 on-site-only. Host signals that actually returned data: 1 of 1 (HW-TE-07). On-site items require
+    physical operator input and are NOT reported as assessed.
+    evidence[None]: None
+    evidence[other]: tamper items and observability

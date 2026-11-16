@@ -1,0 +1,49 @@
+===== ENGINE 3/4: physical_security (YAML checklist + observations) =====
+=== physical_security: Module H - Physical Security ===
+checks declared: 6  -> PHY-01, PHY-02, PHY-03, PHY-04, PHY-05, PHY-06
+results returned: 6  evidence_dir: /workspace/tasks/d7fa18a5-a7d6-4e74-bea4-a0dc525555bc/workstreams/89f666b8-2409-4472-8494-2213ff41d280/evidence/run-physical_security
+
+[PHY-01] FAIL sev=high source=local cvss=6.1 asset=site-a-hq
+    title: Access control audit
+    3 control(s) in 'access_control': 3 observed (2 pass / 1 fail), 0 not applicable, 0 not observed. Failing: AC-02 Server room door. Physical access
+    bypass defeats logical controls that assume a trusted premises.
+    remediation: Remediate AC-02 and record the on-site evidence listed for each control.
+    evidence[other]: access_control checklist evaluation
+
+[PHY-02] FAIL sev=medium source=local cvss=5.0 asset=site-a-hq
+    title: CCTV assessment checklist
+    2 control(s) in 'cctv': 2 observed (1 pass / 1 fail), 0 not applicable, 0 not observed. Failing: CV-02 Retention window. CCTV is detective control
+    only: it limits impact by enabling attribution and response.
+    remediation: Remediate CV-02 and record the on-site evidence listed for each control.
+    evidence[other]: cctv checklist evaluation
+
+[PHY-03] PASS sev=info source=local cvss=None asset=site-a-hq
+    title: Visitor management review
+    2 control(s) in 'visitor_management': 1 observed (1 pass / 0 fail), 1 not applicable, 0 not observed. Unescorted or unverified visitors are the
+    classic route to a rogue device on the LAN.
+    remediation: All applicable controls were observed and passed; keep the evidence current at each review cycle.
+    evidence[other]: visitor_management checklist evaluation
+
+[PHY-04] FAIL sev=medium source=local cvss=5.2 asset=site-a-hq
+    title: Tamper evidence inspection
+    1 control(s) in 'tamper_evidence': 1 observed (0 pass / 1 fail), 0 not applicable, 0 not observed. Failing: TE-01 Cabinet seals. Without seals a
+    physical implant can be installed and removed without trace.
+    remediation: Remediate TE-01 and record the on-site evidence listed for each control.
+    evidence[other]: tamper_evidence checklist evaluation
+
+[PHY-05] INFO sev=info source=local cvss=None asset=HQ Building A
+    title: Physical incident documentation template
+    Wrote a real incident form (markdown) and a register skeleton (CSV) to evidence for site 'HQ Building A'. Documentation controls evaluated from
+    observations: 0 of 2 (0 failing). The template itself is a tool, not a finding.
+    remediation: Use the generated form for every physical incident; it captures the fields needed to close the loop between observation and evidence.
+    evidence[None]: None
+    evidence[None]: None
+    evidence[other]: documentation controls
+
+[PHY-06] FAIL sev=medium source=local cvss=5.7 asset=HQ Building A
+    title: Aggregate physical risk score
+    Observed-only physical risk score: 57.1/100 across 7 observed of 9 applicable control(s); completeness 77.8%. Assessment is INCOMPLETE: 2 control(s)
+    not observed (ID-01, ID-02) - requires on-site operator input.
+    remediation: Close the failing controls and collect the unobserved ones before treating the site as assessed.
+    evidence[None]: None
+    evidence[other]: scoring detail

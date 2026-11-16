@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#070b10">
+<title>WD CYBER TOOLKIT NEO</title>
+<link rel="stylesheet" href="/assets/app.css">
+</head>
+<body>
+
+<!-- ============================ BOOT / LOGIN ============================ -->
+<section id="gate" class="gate">
+  <div class="gate-card">
+    <header class="gate-head">
+      <div class="logo">WD<span>//</span>NEO</div>
+      <h1>CYBER TOOLKIT NEO</h1>
+      <p class="muted">Two-stage operator access &middot; authorized assessments only</p>
+    </header>
+
+    <form id="stage1-form" class="gate-step">
+      <div class="step-tag">STAGE 1 / WD SHORTCUT + CREDENTIALS</div>
+      <label>Operator<input id="g-user" autocomplete="username" required placeholder="WD-OPERATOR-01"></label>
+      <label>Password<input id="g-pass" type="password" autocomplete="current-password" required></label>
+      <label>WD Shortcut code<input id="g-short" required placeholder="WD-XXXXXXXXXXXXX" autocomplete="off"></label>
+      <button class="btn primary" type="submit">VERIFY STAGE 1</button>
+      <div class="gate-msg" id="g1-msg"></div>
+    </form>
+
+    <form id="stage2-form" class="gate-step hidden">
+      <div class="step-tag ok">STAGE 1 ACCEPTED</div>
+      <label>Stage-2 PIN<input id="g-pin" type="password" inputmode="numeric" autocomplete="one-time-code" required placeholder="8-digit PIN"></label>
+      <button class="btn primary" type="submit">AUTHORIZE SESSION</button>
+      <button class="btn ghost" type="button" id="g-back">BACK</button>
+      <div class="gate-msg" id="g2-msg"></div>
+    </form>
+
+    <footer class="gate-foot">
+      <span id="gate-health" class="muted">checking platform…</span>
+    </footer>
+  </div>
+</section>
+
+<!-- ================================ SHELL ============================== -->
+<div id="shell" class="shell hidden">
+  <header class="topbar">
+    <button class="icon-btn" id="nav-toggle" aria-label="Menu">&#9776;</button>
+    <div class="brand">WD<span>//</span>NEO<small>PROFESSIONAL ADVANCED</small></div>
+    <div class="topbar-right">
+      <span id="stop-badge" class="badge stop hidden">EMERGENCY STOP</span>
+      <span id="session-badge" class="badge">stage 0</span>
+      <button class="btn danger sm" id="btn-stop-all" title="Halt all execution server-side">EMERGENCY STOP</button>
+      <button class="btn ghost sm" id="btn-logout">LOGOUT</button>
+    </div>
+  </header>
+
+  <nav id="nav" class="nav">
+    <button data-view="dashboard" class="active">Dashboard</button>
+    <button data-view="modules">Modules</button>
+    <button data-view="scope">Scope</button>
+    <button data-view="assess">New Assessment</button>
+    <button data-view="runs">Assessments</button>
+    <button data-view="findings">Findings</button>
+    <button data-view="reports">Reports</button>
+    <button data-view="audit">Audit</button>
+    <button data-view="caps">Capabilities</button>
+    <button data-view="artax">Artax AI</button>
+    <button data-view="integrations">Integrations</button>
+  </nav>
+
+  <main id="main" class="main">
+    <!-- ------------------------------------------------------ dashboard -->
+    <section class="view" id="view-dashboard">
+      <div class="view-head"><h2>Operations Dashboard</h2><span class="muted" id="dash-ts"></span></div>
+      <div class="grid kpis" id="kpis"></div>
+      <div class="grid two">
+        <div class="card"><h3>Findings by severity</h3><div id="sev-chart" class="chart"></div></div>
+        <div class="card"><h3>Platform state</h3><div id="platform-state" class="kv"></div></div>
+      </div>
+      <div class="card"><h3>Recent assessments</h3><div id="recent-runs" class="table-wrap"></div></div>
+    </section>
+
+    <!-- -------------------------------------------------------- modules -->
+    <section class="view hidden" id="view-modules">
+      <div class="view-head"><h2>Security Modules</h2><span class="muted">A–J · real engines</span></div>
+      <div id="modules-grid" class="grid cards3"></div>
+    </section>
+
+    <!-- ---------------------------------------------------------- scope -->
+    <section class="view hidden" id="view-scope">
+      <div class="view-head"><h2>Target Scope Registry</h2><span class="muted">only registered targets may be tested</span></div>
+      <div class="card">
+        <form id="scope-form" class="row-form">
+          <input id="scope-target" placeholder="10.0.0.0/24 · example.com · https://app.example.com · can:vcan0 · modbus://10.0.0.5:502" required>
+          <input id="scope-desc" placeholder="description (optional)">
+          <button class="btn primary" type="submit">ADD TARGET</button>
+        </form>
+        <div class="hint">Type is auto-detected. Wildcard subdomains of a registered domain are covered.</div>
+      </div>
+      <div class="card"><div id="scope-list" class="table-wrap"></div></div>
+    </section>
+
+    <!-- --------------------------------------------------------- assess -->
+    <section class="view hidden" id="view-assess">
+      <div class="view-head"><h2>New Assessment</h2><span class="muted">scope → preflight → confirm → execute</span></div>
+      <div class="grid two">
+        <div class="card">
+          <h3>1 · Template</h3>
+          <select id="a-template"></select>
+          <div id="tpl-detail" class="kv small"></div>
+        </div>
+        <div class="card">
+          <h3>2 · Targets &amp; execution</h3>
+          <label>Targets (comma or newline separated)<textarea id="a-targets" rows="3" placeholder="testssl.sh"></textarea></label>
+          <div class="row2">
+            <label>Mode<select id="a-mode"><option value="live">live</option><option value="lab">lab (bundled simulator)</option></select></label>
+            <label>Intensity<select id="a-intensity"><option>light</option><option selected>normal</option><option>deep</option></select></label>
+          </div>
+          <label>Extra params (JSON)<textarea id="a-params" rows="3" spellcheck="false">{}</textarea></label>
+          <div class="row2">
+            <label>Authorization TTL (min)<input id="a-ttl" type="number" value="60" min="1" max="720"></label>
+            <label>Intended test note<input id="a-note" placeholder="authorized assessment of X"></label>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>3 · Preflight &amp; scope validation</h3>
+        <div id="preflight" class="kv small"></div>
+        <div class="row-actions">
+          <button class="btn" id="btn-preflight">VALIDATE</button>
+          <button class="btn primary" id="btn-create-run">AUTHORIZE &amp; EXECUTE</button>
+        </div>
+        <div id="assess-msg" class="gate-msg"></div>
+      </div>
+      <div class="card hidden" id="job-card">
+        <h3>Live execution</h3>
+        <div class="progress"><div id="job-bar" class="progress-bar"></div></div>
+        <div class="muted small" id="job-meta"></div>
+        <pre id="job-log" class="logbox"></pre>
+      </div>
+    </section>
+
+    <!-- ----------------------------------------------------------- runs -->
+    <section class="view hidden" id="view-runs">
+      <div class="view-head"><h2>Assessments</h2><button class="btn sm" id="btn-refresh-runs">REFRESH</button></div>
+      <div class="card"><div id="runs-list" class="table-wrap"></div></div>
+      <div class="card hidden" id="run-detail"><h3 id="run-detail-title">Assessment</h3><div id="run-detail-body"></div></div>
+    </section>
+
+    <!-- ------------------------------------------------------- findings -->
+    <section class="view hidden" id="view-findings">
+      <div class="view-head"><h2>Findings</h2><span class="muted" id="findings-scope"></span></div>
+      <div class="card">
+        <div class="row-form">
+          <select id="f-run"></select>
+          <select id="f-sev"><option value="">all severities</option><option>critical</option><option>high</option><option>medium</option><option>low</option><option>info</option></select>
+          <button class="btn" id="btn-load-findings">LOAD</button>
+        </div>
+      </div>
+      <div id="findings-list"></div>
+    </section>
+
+    <!-- -------------------------------------------------------- reports -->
+    <section class="view hidden" id="view-reports">
+      <div class="view-head"><h2>Report Generator</h2><span class="muted">12 sections · EN / ID · PDF / HTML / MD</span></div>
+      <div class="card">
+        <div class="row-form">
+          <select id="r-run"></select>
+          <select id="r-fmt"><option value="pdf">PDF</option><option value="html">HTML</option><option value="md">Markdown</option></select>
+          <select id="r-lang"><option value="en">English</option><option value="id">Bahasa Indonesia</option></select>
+          <button class="btn primary" id="btn-report">GENERATE</button>
+          <button class="btn" id="btn-report-save">SAVE TO DISK</button>
+        </div>
+        <div id="report-msg" class="gate-msg"></div>
+      </div>
+      <div class="card"><pre id="report-preview" class="logbox tall">Select an assessment to preview.</pre></div>
+    </section>
+
+    <!-- ---------------------------------------------------------- audit -->
+    <section class="view hidden" id="view-audit">
+      <div class="view-head"><h2>Audit &amp; Forensics</h2>
+        <div class="row-actions">
+          <button class="btn sm" id="btn-audit-verify">VERIFY CHAIN</button>
+          <a class="btn sm ghost" id="btn-audit-json" href="/api/audit/export?fmt=json" target="_blank">JSON</a>
+          <a class="btn sm ghost" id="btn-audit-csv" href="/api/audit/export?fmt=csv" target="_blank">CSV</a>
+        </div>
+      </div>
+      <div class="card"><div id="audit-verify" class="kv small"></div></div>
+      <div class="card"><div id="audit-list" class="table-wrap"></div></div>
+    </section>
+
+    <!-- ----------------------------------------------------------- caps -->
+    <section class="view hidden" id="view-caps">
+      <div class="view-head"><h2>Capabilities &amp; Dependencies</h2><button class="btn sm" id="btn-refresh-caps">RE-DETECT</button></div>
+      <div class="grid two">
+        <div class="card"><h3>CLI tools</h3><div id="caps-cli" class="table-wrap"></div></div>
+        <div class="card"><h3>Python modules</h3><div id="caps-py" class="table-wrap"></div></div>
+      </div>
+      <div class="card"><h3>Host &amp; interfaces</h3><pre id="caps-host" class="logbox"></pre></div>
+    </section>
+
+    <!-- ---------------------------------------------------------- artax -->
+    <section class="view hidden" id="view-artax">
+      <div class="view-head">
+        <h2>Artax AI</h2>
+        <span id="artax-mode" class="badge">checking mode…</span>
+      </div>
+
+      <div class="card">
+        <div class="row-form">
+          <select id="artax-run"><option value="">platform (no assessment)</option></select>
+          <select id="artax-preset">
+            <option value="">custom question</option>
+            <option value="executive_summary">Executive summary</option>
+            <option value="remediation_plan">Remediation plan</option>
+            <option value="coverage_review">Coverage review</option>
+            <option value="attack_paths">Attack paths</option>
+            <option value="report_review">Report review</option>
+          </select>
+          <button class="btn" id="artax-reload">RELOAD</button>
+        </div>
+        <div class="hint" id="artax-hint">
+          Artax reasons only from evidence this platform produced. "lab" means simulator,
+          "unavailable" means the check could not run (a gap, not a pass).
+        </div>
+      </div>
+
+      <div class="card">
+        <label>Question<textarea id="artax-q" rows="2" placeholder="Apa prioritas perbaikan dan apa yang belum teruji?"></textarea></label>
+        <div class="row-actions">
+          <button class="btn primary" id="artax-ask">ASK ARTAX</button>
+          <button class="btn ghost" id="artax-clear">CLEAR</button>
+        </div>
+        <div class="gate-msg" id="artax-msg"></div>
+      </div>
+
+      <div class="card">
+        <h3>Conversation</h3>
+        <div id="artax-thread" class="artax-thread">
+          <div class="empty">No questions yet. Pick an assessment and ask Artax.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- --------------------------------------------------- integrations -->
+    <section class="view hidden" id="view-integrations">
+      <div class="view-head">
+        <h2>Upstream Integrations</h2>
+        <button class="btn sm" id="int-reload">RE-PROBE</button>
+      </div>
+      <div class="card">
+        <div class="hint">
+          Each upstream is pinned to a commit. Services (ARTEX, ScopeSentry) are optional:
+          if unreachable they report the reason instead of pretending to answer.
+        </div>
+      </div>
+      <div id="int-grid" class="grid cards3"></div>
+
+      <div class="card">
+        <h3>katana crawl (real)</h3>
+        <div class="row-form">
+          <input id="int-crawl-url" placeholder="https://target.example" value="">
+          <select id="int-crawl-depth"><option>1</option><option selected>2</option><option>3</option></select>
+          <input id="int-crawl-secs" type="number" value="30" min="5" max="300">
+          <button class="btn primary" id="int-crawl-go">CRAWL</button>
+        </div>
+        <div class="gate-msg" id="int-crawl-msg"></div>
+        <div id="int-crawl-out" class="table-wrap"></div>
+      </div>
+
+      <div class="card">
+        <h3>Vendored nuclei templates (oscuridad SQLi)</h3>
+        <div id="int-templates" class="table-wrap"></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+<script src="/assets/api.js"></script>
+<script src="/assets/ui.js"></script>
+<script src="/assets/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,25 @@
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.env
+database/*.db
+database/*.db-wal
+database/*.db-shm
+database/bootstrap_credentials.txt
+evidence/*
+!evidence/.gitkeep
+reports/*
+!reports/.gitkeep
+*.log
+.DS_Store
+
+# local runtime state and private material
+private/
+*.db
+database/*.db
+database/*.db-wal
+database/*.db-shm
+database/bootstrap_credentials.txt
+database/nuclei_*.jsonl
+.keys/
