@@ -1229,6 +1229,20 @@ class SCADAEngine:
         if build:
             description += (" OPC UA BuildInfo: "
                             + ", ".join(f"{k}={v}" for k, v in build.items() if k != "error")[:300] + ".")
+        if not evidence:
+            # Device identification (FC 0x2B/0x0E) and OPC UA endpoint browsing are the
+            # *enrichment* of this check; when they time out on a slow lab server the
+            # inventory still holds real observations, so attach those rather than
+            # emitting a result with no evidence at all.
+            unit_summary = {k: [u["unit_id"] for u in v if u.get("responded")]
+                            for k, v in inventory["unit_ids"].items()}
+            evidence = [{"type": "other",
+                         "summary": "Service inventory from the endpoint/unit responses",
+                         "method": "Modbus FC03 per unit (1, 2, 247, 255, params.unit_id) and "
+                                   "OPC UA GetEndpoints when the protocol was confirmed",
+                         "endpoints": inventory["endpoints"],
+                         "unit_ids_responding": unit_summary,
+                         "servers": inventory["servers"]}]
         ctx.add(Result("ICS-03", "ICS service inventory", status, severity="info",
                        description=description, asset=self._primary_asset(),
                        source=state.source, evidence=evidence, data=inventory))
