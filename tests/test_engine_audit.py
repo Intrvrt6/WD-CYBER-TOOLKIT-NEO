@@ -140,7 +140,7 @@ def test_findings_have_unique_ids_per_engine(engine_results):
     for module, results in engine_results.items():
         ids = [r.check_id for r in results]
         # suffixed variants (NET-05b) are legitimate; exact duplicates are not
-        # CAN-05 deliberately emits one result per anomaly CLASS observed, so it
-        # is the single documented exception; everything else must be unique.
-        dupes = {i for i in ids if ids.count(i) > 1 and i != "CAN-05"}
+        # Every result id must be unique. CAN-05's per-anomaly-class findings
+        # carry a..e suffixes (CAN-05a..CAN-05e), so even it cannot repeat.
+        dupes = {i for i in ids if ids.count(i) > 1}
         assert not dupes, f"{module} emitted duplicate result ids: {sorted(dupes)}"

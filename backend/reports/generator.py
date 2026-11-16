@@ -40,6 +40,7 @@ I18N: dict[str, dict[str, str]] = {
         "roe": "Testing was performed within an approved window with explicit operator authorization recorded in the immutable audit log.",
         "retest": "No retest has been executed for this assessment. Re-run the template after remediation to populate this section.",
         "concl": "Findings above reflect checks that actually executed; unavailable checks are listed explicitly and are not represented as passes.",
+        "checklist_summary": "{executed} of {total} declared check(s) executed; {not_run} could not run.",
     },
     "id": {
         "title": "Laporan Uji Penetrasi",
@@ -56,6 +57,7 @@ I18N: dict[str, dict[str, str]] = {
         "roe": "Pengujian dilakukan dalam jendela yang disetujui dengan otorisasi operator eksplisit yang tercatat pada log audit.",
         "retest": "Belum ada uji ulang untuk asesmen ini. Jalankan kembali template setelah perbaikan untuk mengisi bagian ini.",
         "concl": "Temuan di atas mencerminkan pemeriksaan yang benar-benar dieksekusi; pemeriksaan yang tidak tersedia dicantumkan eksplisit dan tidak dianggap lulus.",
+        "checklist_summary": "{executed} dari {total} pemeriksaan yang dideklarasikan dieksekusi; {not_run} tidak dapat dijalankan.",
     },
 }
 
@@ -86,6 +88,9 @@ def build_report_data(db, assessment_id: str, lang: str = "en") -> dict[str, Any
         "tools": tools, "summary": summary,
         "expected": summary.get("checks_expected") or [],
         "reported": summary.get("checks_reported") or [],
+        "unavailable": (summary.get("coverage") or {}).get("unavailable_checks") or [],
+        "unavailable_reasons": {f.check_id: f.description for f in ordered
+                                if f.status == "unavailable" and f.check_id},
     }
 
 
@@ -142,10 +147,25 @@ def render_markdown(data: dict[str, Any]) -> str:
     ap(f"## {_t(lang,'s4')}")
     ap(f"### {_t(lang,'checklist')}")
     done = set(data["reported"])
-    for cid in data["expected"]:
-        mark = "x" if cid in done else " "
-        note = "" if cid in done else f"  ({_t(lang,'not_run')})"
-        ap(f"- [{mark}] `{cid}`{note}")
+    skipped = set(data.get("unavailable") or [])
+    reasons = data.get("unavailable_reasons") or {}
+    executed = [c for c in data["expected"] if c in done and c not in skipped]
+    not_exec = [c for c in data["expected"] if c in skipped]
+    unreached = [c for c in data["expected"] if c not in done and c not in skipped]
+    for cid in executed:
+        ap(f"- [x] `{cid}`")
+    for cid in not_exec:
+        why = (reasons.get(cid) or "").strip()
+        why = (why[:200] + "...") if len(why) > 200 else why
+        ap(f"- [!] `{cid}` - {_t(lang,'not_run')}" + (f": {why}" if why else ""))
+    for cid in unreached:
+        ap(f"- [ ] `{cid}` - {_t(lang,'not_run')}")
+    ap("")
+    ap(_t(lang, "checklist_summary").format(
+        executed=len(executed),
+        not_run=len(not_exec) + len(unreached),
+        total=len(data["expected"]),
+    ))
     ap("")
     ap(f"## {_t(lang,'s5')}")
     for name, info in sorted(data["tools"].items()):
@@ -315,9 +335,14 @@ def render_pdf(data: dict[str, Any]) -> bytes:
     story.append(Paragraph(_t(lang, "s4"), H2))
     story.append(Paragraph(_t(lang, "checklist"), H3))
     done = set(data["reported"])
+    skipped = set(data.get("unavailable") or [])
     for cid in data["expected"]:
-        mark = "[x]" if cid in done else "[ ]"
-        note = "" if cid in done else f" - {_t(lang, 'not_run')}"
+        if cid in done and cid not in skipped:
+            mark, note = "[x]", ""
+        elif cid in skipped:
+            mark, note = "[!]", f" - {_t(lang, 'not_run')}"
+        else:
+            mark, note = "[ ]", f" - {_t(lang, 'not_run')}"
         story.append(Paragraph(f"{mark} {html.escape(cid)}{html.escape(note)}", SMALL))
 
     story.append(Paragraph(_t(lang, "s5"), H2))

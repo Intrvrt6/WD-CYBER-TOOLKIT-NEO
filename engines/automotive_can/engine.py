@@ -890,16 +890,28 @@ class CANEngine:
         by_class: dict[str, list[dict]] = {}
         for item in anomalies:
             by_class.setdefault(item["class"], []).append(item)
+        # One result per anomaly CLASS, each with its own stable suffix so the
+        # findings stay individually referenceable in a report.
+        class_suffix = {"counter_discontinuity": "a", "period_deviation": "b",
+                        "dlc_change": "c", "payload_frozen": "d", "late_id": "e"}
+        # `first` tracks whether the artefact reference has already been attached. It
+        # was referenced but never initialised, so the first anomaly class raised
+        # NameError and the run recorded an evidence-less error result instead of the
+        # measured anomaly. Latent until a capture actually produced anomalies.
+        first = True
+        # `first` decides whether the shared anomalies artifact is attached in
+        # full or referenced by path on subsequent results.
         first = True
         for cls in ("counter_discontinuity", "period_deviation", "dlc_change",
                     "payload_frozen", "late_id"):
             items = by_class.get(cls)
             if not items:
                 continue
+            check_id = f"CAN-05{class_suffix[cls]}"
             detail = " | ".join(f"{_aid_hex(i['aid'])}: {i['detail']}" for i in items[:6])
             frames_ev = [fr for i in items[:4] for fr in i["frames"][:4]]
             ctx.add(Result(
-                "CAN-05", f"Anomaly detected - {cls.replace('_', ' ')}", "fail",
+                check_id, f"Anomaly detected - {cls.replace('_', ' ')}", "fail",
                 severity=severity.get(cls, "low"),
                 description=(f"{len(items)} {cls.replace('_', ' ')} anomaly(ies) measured in the "
                              f"captured traffic ({detail})."),
