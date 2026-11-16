@@ -23,3 +23,7 @@ database/*.db-shm
 database/bootstrap_credentials.txt
 database/nuclei_*.jsonl
 .keys/
+
+# local run dirs created by helper scripts
+.run/
+ui-proof*/\.run/
