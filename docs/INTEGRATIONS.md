@@ -1,106 +1,127 @@
 # Upstream Integrations
 
-WD CYBER TOOLKIT NEO integrates with five upstream projects. Each is pinned to an exact
-commit so behaviour is reproducible, and each adapter reports **`available: true/false` with
-a concrete reason** — a missing service is never presented as a passing check.
+WD CYBER TOOLKIT NEO talks to seven upstream projects. Each is pinned to a commit
+(see [`../NOTICE.md`](../NOTICE.md)) and each is **optional**: if it is missing the
+platform reports `available:false` with a concrete reason instead of faking a result.
 
-| id | Upstream | License | Revision | Kind |
-|---|---|---|---|---|
-| `artex` | [BaaRai/ARTEX](https://github.com/BaaRai/ARTEX) | AGPL-3.0 | `d005bfe5ba11` | REST service (Go + PostgreSQL) |
-| `scopesentry` | [Autumn-27/ScopeSentry](https://github.com/Autumn-27/ScopeSentry) | see upstream | `d770b7a137ec` | REST service (FastAPI + Vue) |
-| `scopesentry_scan` | [Autumn-27/ScopeSentry-Scan](https://github.com/Autumn-27/ScopeSentry-Scan) | see upstream | `cf9a46e176f0` | Node binary (Go) |
-| `scopesentry_docs` | [Autumn-27/ScopeSentry-doc-src](https://github.com/Autumn-27/ScopeSentry-doc-src) | see upstream | `6c9552decaf0` | Documentation site |
-| `ksubdomain` | [Autumn-27/ksubdomain](https://github.com/Autumn-27/ksubdomain) | MIT | `9790e99b17e7` | CLI binary (Go) |
-| `katana` | [Autumn-27/katana](https://github.com/Autumn-27/katana) | MIT | `05e5ecf57e57` | CLI binary (Go) |
-| `nuclei_templates` | [Autumn-27/nuclei-template](https://github.com/Autumn-27/nuclei-template) | MIT | `d05da2145064` | Vendored templates (in-repo) |
-
-> Pinning to a commit is a deliberate reproducibility choice: it is not a claim that the
-> pinned revision is the current upstream HEAD.
-
-## Licensing posture
-
-- **AGPL-3.0 (ARTEX):** treated as a *separate process*. WD NEO talks to it over HTTP and does
-  not vendor or link its code, which keeps this repository's own licensing simple. If you
-  redistribute a combined work, review AGPL-3.0 obligations.
-- **MIT (katana, ksubdomain, nuclei-template):** the nuclei templates are vendored directly
-  under `templates/nuclei/oscuridad/`, WITH the upstream `LICENSE` file preserved.
-  `katana` and `ksubdomain` are invoked as installed binaries, not vendored.
-- **ScopeSentry family:** license terms are defined by its own repository; the docs source is
-  only linked/probed, never copied.
+```
+GET  /api/integrations              catalog: repo, licence, pinned commit, env vars
+GET  /api/integrations/status       live probe of all seven
+GET  /api/integrations/artex/overview
+GET  /api/integrations/scopesentry/overview
+GET  /api/integrations/nuclei/templates
+POST /api/integrations/katana/crawl       {url, depth, duration_s, js_crawl}
+POST /api/integrations/nuclei/sqli        {url, use_workflow, timeout_s}
+POST /api/integrations/ksubdomain/enum    {domain, dict_path, duration_s}
+```
 
 ## Configuration
 
-All integrations are optional. Set what you have:
+| Variable | Used by | Meaning |
+|---|---|---|
+| `WD_ARTAX_URL` | ARTEX | Base URL of a running ARTEX instance, e.g. `http://127.0.0.1:8787` |
+| `WD_ARTAX_TOKEN` | ARTEX | Bearer token, if ARTEX requires one |
+| `WD_SCOPESENTRY_URL` | ScopeSentry | Base URL of the ScopeSentry server |
+| `WD_SCOPESENTRY_TOKEN` | ScopeSentry | Bearer token for its API |
+| `WD_SCOPESENTRY_SCAN_BIN` | ScopeSentry-Scan | Path to the scan-node binary |
+| `WD_SCOPESENTRY_DOCS_URL` | ScopeSentry-doc-src | Hosted docs site to link/probe |
+| `WD_KSUBDOMAIN_BIN` | ksubdomain | Path to `ksubdomain` |
+| `WD_KATANA_BIN` | katana | Path to `katana` |
+| `WD_NUCLEI_BIN` | nuclei | Path to `nuclei` |
+| `WD_NUCLEI_TEMPLATE_DIR` | nuclei-template | Override the vendored template directory |
+
+Binaries are also discovered on `PATH`, so usually you only set the URL variables.
+
+## ARTEX
+
+A separate Go + PostgreSQL service. WD NEO never vendors it (AGPL-3.0 stays at arm's
+length). Bring it up from its own checkout:
 
 ```bash
-# ARTEX service (leave unset to disable)
-WD_ARTAX_URL=http://127.0.0.1:8787
-WD_ARTAX_TOKEN=<artex api token>
-
-# ScopeSentry server
-WD_SCOPESENTRY_URL=http://127.0.0.1:8082
-WD_SCOPESENTRY_TOKEN=<scopesentry token>
-
-# ScopeSentry scan node binary
-WD_SCOPESENTRY_SCAN_BIN=/usr/local/bin/ScopeSentry-Scan
-
-# CLI binaries (auto-detected on PATH when unset)
-WD_KATANA_BIN=/usr/local/bin/katana
-WD_KSUBDOMAIN_BIN=/usr/local/bin/ksubdomain
+git clone https://github.com/BaaRai/ARTEX && cd ARTEX
+cp .env.example .env         # set POSTGRES_PASSWORD
+docker compose up -d --build
+# then, for WD NEO:
+export WD_ARTAX_URL=http://127.0.0.1:8787
 ```
 
-Check what is live at any time:
+ARTEX's own onboarding lives at `/setup` (one-time setup token printed in its logs).
+
+## ScopeSentry family
+
+ScopeSentry is the asset-discovery server (FastAPI + Vue); ScopeSentry-Scan is a Go
+node agent that executes its tasks; ScopeSentry-doc-src is the documentation site.
+WD NEO consumes the server's REST API and reports node/binary presence — it does not
+pretend to drive nodes.
 
 ```bash
-curl -s $API/api/integrations/status -H "authorization: Bearer $TOKEN" | jq
+export WD_SCOPESENTRY_URL=http://127.0.0.1:8082
+export WD_SCOPESENTRY_TOKEN=...            # if your instance requires auth
+export WD_SCOPESENTRY_SCAN_BIN=/opt/scopesentry-scan/ScopeSentry-Scan
 ```
 
-or open the **Integrations** tab in the UI.
-
-## What each integration actually does
-
-### katana — real crawling (verified)
+## katana (crawler)
 
 ```bash
-curl -s -X POST $API/api/integrations/katana/crawl \
+katana -version                # verified here: installed on PATH
+export WD_KATANA_BIN=/usr/local/bin/katana   # optional
+```
+
+`POST /api/integrations/katana/crawl` returns parsed endpoints (method, URL, source,
+status) plus the raw command evidence. `-jsl` (JS link parsing) is **opt-in only**:
+it needs a headless browser and is memory hungry, so it is never enabled implicitly.
+
+Verified: crawling the local WD NEO UI returned 6 real endpoints.
+
+## nuclei-template (oscuridad SQLi set) — vendored
+
+These four files are MIT-licensed, so they ship inside this repository at
+`templates/nuclei/` and run offline. Two gotchas were found and are handled:
+
+1. **Duplicate template id.** All three templates declare `id: oscuridad-sql`. Passing
+them as three `-t` flags makes nuclei fail with *"no templates provided for scan"*.
+   Pass the **directory** or the **workflow** instead.
+2. **They are DAST templates.** They use `fuzzing:`, which nuclei disables by default.
+   Without `-dast`, nuclei loads zero templates and sends no requests — which looks
+   exactly like a clean (false-negative) result. The adapter always sets `-dast`.
+
+```bash
+curl -X POST $API/api/integrations/nuclei/sqli \
   -H "authorization: Bearer $TOKEN" -H 'content-type: application/json' \
-  -d '{"url":"https://target.example","depth":2,"duration_s":30}' | jq '.count'
+  -d '{"url":"https://target.example/product?id=1"}'
 ```
 
-Returns parsed endpoints (`method`, `url`, `source`, `status`). `-jsonl` is used for
-machine-readable output. **`-jsl` is never enabled implicitly** — JS link parsing needs a
-headless browser and is memory-hungry; pass `js_crawl: true` (optionally `headless: true`)
-to opt in.
+Verified detection (not just a clean exit) against the deliberately vulnerable
+fixture in `tests/sqli_target.py`:
 
-### nuclei templates — real SQLi detection (verified)
+```
+DETECTED: high | oscuridad-sql00 | Blind SQL Injection time based detection of sql backend
+          | http://127.0.0.1:8095/?id=1'
+```
 
-The oscuridad set is vendored at `templates/nuclei/oscuridad/`. Two upstream defects are
-handled by the adapter:
+## ksubdomain
 
-1. **All three files declared `id: oscuridad-sql`.** nuclei refuses a multi-template scan with
-   duplicate IDs and then reports the unhelpful `no templates provided for scan`. They are
-   re-id'd to `oscuridad-sql00/01/02`.
-2. **Fuzzing templates require `-dast`.** Without it nuclei loads them but issues no requests —
-   a silent false negative. The adapter always sets `-dast`.
+Stateless subdomain brute force. Needs `CAP_NET_RAW`; without it the adapter says so
+rather than returning "no subdomains found".
 
-Verified against a lab endpoint that delays on a bare quote: two templates matched with
-payloads `'+or+sleep(7)--+#` and `+XOR(if(now()=sysdate(),sleep(1),0))XOR%23`.
+```bash
+curl -X POST $API/api/integrations/ksubdomain/enum \
+  -H "authorization: Bearer $TOKEN" -H 'content-type: application/json' \
+  -d '{"domain":"example.com","duration_s":60}'
+```
 
-### ARTEX — autonomous pentest engine
+A default wordlist lives at `samples/subdomains.txt` (6 entries, deliberately small);
+pass `dict_path` to use your own.
 
-`GET /api/integrations/artex/overview` proxies its `/api/auth/status`, `/api/stats` and
-`/api/tasks`. When `WD_ARTAX_URL` is unset the response says so
-(`"reason": "not configured (set WD_ARTAX_URL)"`) instead of returning empty data that could
-be mistaken for a real result.
+## Why the platform stays honest
 
-### ScopeSentry — asset management
+Every integration response carries either real data or an explicit reason:
 
-`GET /api/integrations/scopesentry/overview` returns its health probe plus an asset page.
-The scan-node integration detects the binary and reports its version; driving nodes directly
-is the ScopeSentry server's job, not this platform's.
+```json
+{"available": false, "reason": "not configured (set WD_ARTAX_URL)"}
+{"available": false, "reason": "not found (set WD_KSUBDOMAIN_BIN or install ksubdomain)"}
+{"available": true,  "version": "KSubdomain version 1.9.5"}
+```
 
-## Attribution
-
-Upstream projects are the work of their authors. WD CYBER TOOLKIT NEO's adapters are thin
-clients; all detection logic, crawling and template content belong to the upstream projects.
-Nothing here claims official affiliation with or endorsement by those authors.
+That way an unconfigured upstream shows up as a coverage gap in reports, never as a
+silent pass.

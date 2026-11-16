@@ -149,13 +149,15 @@ WD_ARTAX_MODEL=gpt-4o-mini      # or any chat-completions model
 
 ## 4. Upstream integrations
 
-Five upstream projects are wired in, each pinned to a commit. See
+Seven upstream projects are wired in, each pinned to a commit. See
 [`docs/INTEGRATIONS.md`](docs/INTEGRATIONS.md) for the full table, licensing posture and config.
 
 | Upstream | Kind | Verified behaviour |
 |---|---|---|
 | **ARTEX** (BaaRai) | REST service | status/stats/tasks proxied; reports "not configured" when unset |
-| **ScopeSentry** | REST service | health + asset page; scan-node binary detected |
+| **ScopeSentry** | REST service | health + asset page |
+| **ScopeSentry-Scan** | node binary | detected by path; presence reported honestly |
+| **ScopeSentry-doc-src** | docs site | linked/probeable; no runtime API |
 | **ksubdomain** | CLI binary | auto-detected on PATH |
 | **katana** | CLI binary | **real crawl** — returns parsed endpoints |
 | **nuclei-template** (oscuridad) | vendored | **real SQLi detection** — 2 high-severity matches on a lab target |
