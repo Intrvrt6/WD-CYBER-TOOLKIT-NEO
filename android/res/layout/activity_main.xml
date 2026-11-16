@@ -109,6 +109,15 @@
                     android:orientation="horizontal"
                     android:paddingTop="14dp">
                     <Button
+                        android:id="@+id/btn_detect"
+                        style="@style/WdButton"
+                        android:layout_width="0dp"
+                        android:layout_weight="1"
+                        android:layout_height="wrap_content"
+                        android:text="@string/btn_detect"
+                        android:contentDescription="@string/hint_detect"
+                        android:layout_marginEnd="8dp" />
+                    <Button
                         android:id="@+id/btn_connect"
                         style="@style/WdButton"
                         android:layout_width="0dp"

@@ -95,7 +95,7 @@ export WD_SHORTCUT=WD-XXXXXXXXXXXXX
 ./scripts/run.sh
 ```
 
-Run the test suite (197 collected tests: hashing, auth, lockout, per-identity rate limiting, stage-2 PIN
+Run the test suite (227 collected tests: hashing, auth, lockout, per-identity rate limiting, stage-2 PIN
 ceiling, scope, authorization ownership, static-file containment, audit chain + concurrency,
 emergency stop, engine contract, full API flow):
 
@@ -105,14 +105,42 @@ emergency stop, engine contract, full API flow):
 
 ### Android / Termux
 
+The platform runs **on the phone itself** — full backend, all engines, web UI:
+
 ```bash
-pkg install python nmap tshark tcpdump iputils dnsutils can-utils \
-            binutils openssl yara jq clang
-pip install -r requirements.txt
-python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000
+pkg install -y git
+cd ~ && git clone https://github.com/Intrvrt6/WD-CYBER-TOOLKIT-NEO.git
+cd WD-CYBER-TOOLKIT-NEO
+bash scripts/termux.sh          # installs packages + deps, inits DB, starts server
 ```
 
-Then browse to the device's IP from any client. The UI is responsive and touch-friendly.
+It prints the addresses that actually work:
+
+```
+ this device : http://127.0.0.1:8000   <-- open in the phone's browser
+ LAN        : http://192.168.1.42:8000  <-- other devices on the same Wi-Fi
+```
+
+`scripts/termux.sh` handles what the generic installer cannot: `pkg` instead of
+`apt`, `clang` for native extensions, no venv, a **core-only** requirement set
+(`requirements-core.txt`), and a `termux-wake-lock` so the server survives
+screen-off.
+
+Android has no `iproute2`, so interface detection falls back
+`ip -br addr → ip addr show → ifconfig -a → psutil → ioctl(SIOCGIFADDR)` and reports
+which path it used — the UI no longer shows zero interfaces on a phone.
+
+Live packet capture needs root (`pkg install tsu`, then run under `sudo tsu`);
+`lab` mode and all socket-based modules work unprivileged.
+
+**The APK connects to that console** with no configuration: it defaults to
+`http://127.0.0.1:8000` and its **DETECT** button discovers the right address via
+`GET /api/network`. Full guide: [`docs/TERMUX.md`](docs/TERMUX.md).
+
+```bash
+bash scripts/termux.sh --check    # diagnose the environment
+python3 scripts/termux_proof.py   # 30 end-to-end checks under a simulated Termux
+```
 
 ### Native Android client (`android/`)
 
@@ -123,7 +151,7 @@ no network access at build time — the SDK build tools are invoked directly.
 ```bash
 ./android/prepare_sdk.sh      # once: fetches build-tools, android.jar and R8
 ./android/build_apk.sh        # -> android/dist/wd-neo.apk (signed, zipaligned)
-./android/run_harness.sh http://127.0.0.1:8000   # 29 core-client checks over real HTTP
+./android/run_harness.sh http://127.0.0.1:8000   # 30 core-client checks over real HTTP
 ```
 
 The harness compiles the *same* `Json`/`HttpClient`/`WdApi` sources that are packaged into the
@@ -289,7 +317,7 @@ WD-CYBER-TOOLKIT-NEO/
 ├── database/                 SQLite DB + one-time bootstrap credentials
 ├── evidence/                 per-assessment evidence artifacts
 ├── reports/                  generated reports + run logs
-├── tests/                    pytest suite (197 tests)
+├── tests/                    pytest suite (227 tests)
 ├── scripts/                  install.sh, run.sh, test.sh
 ├── docs/                     ARCHITECTURE.md, OPERATOR_MANUAL.md, API.md, SECURITY.md
 ├── requirements.txt
@@ -320,3 +348,4 @@ WD-CYBER-TOOLKIT-NEO/
 - [`docs/OPERATOR_MANUAL.md`](docs/OPERATOR_MANUAL.md) — day-to-day workflow, safety, reporting
 - [`docs/API.md`](docs/API.md) — endpoint reference with examples
 - [`docs/SECURITY.md`](docs/SECURITY.md) — access model, cryptography, audit integrity
+- [`docs/TERMUX.md`](docs/TERMUX.md) — run on Android, connect the APK, troubleshoot

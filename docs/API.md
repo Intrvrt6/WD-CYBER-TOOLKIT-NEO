@@ -11,7 +11,8 @@ Interactive schema: `/api/docs` · OpenAPI: `/api/openapi.json`
 | Method | Path | Returns |
 |---|---|---|
 | GET | `/api/health` | status, version, engine registry status, emergency-stop state |
-| GET | `/api/capabilities` | detected CLI tools + Python modules, host, interfaces, CAN, USB, raw-socket |
+| GET | `/api/capabilities` | detected CLI tools + Python modules, host, interfaces, CAN, USB, raw-socket, platform |
+| GET | `/api/network` | **unauthenticated** discovery: platform, port, bind host, `on_device_url` (loopback), `lan_url`, all candidate `urls`, interface source. Addressing facts only — no scope, findings or secrets |
 | GET | `/api/version` | instance/version/python |
 
 ## Authentication

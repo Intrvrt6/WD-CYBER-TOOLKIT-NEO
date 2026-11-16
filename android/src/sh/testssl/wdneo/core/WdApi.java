@@ -46,6 +46,16 @@ public final class WdApi {
         return http.getJson("/api/capabilities");
     }
 
+    /**
+     * GET /api/network - discovery payload (platform, LAN ip, candidate URLs).
+     *
+     * Public: the client calls it before it has a token, so it can learn which
+     * address to use instead of guessing one.
+     */
+    public Map<String, Object> network() throws HttpClient.ApiException {
+        return http.getJson("/api/network");
+    }
+
     // --------------------------------------------------------------- auth ----
 
     /** POST /api/auth/stage1 - WD shortcut + operator password. */

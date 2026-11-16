@@ -63,4 +63,6 @@
     <string name="msg_no_scope">Scope registry is empty. Add the targets you are authorized to test.</string>
     <string name="msg_stop_active">EMERGENCY STOP ACTIVE</string>
     <string name="hint_authorization">Only registered targets may be tested. The platform re-checks scope before every run.</string>
+    <string name="btn_detect">DETECT</string>
+    <string name="hint_detect">Detect the console running on this phone</string>
 </resources>

@@ -9,6 +9,14 @@ cd "$ROOT"
 echo "=== WD CYBER TOOLKIT NEO - install ==="
 echo "root: $ROOT"
 
+# Termux needs `pkg`, a clang toolchain and a core-only dependency set; the
+# generic path below would create a venv and pull compile-heavy packages that
+# do not build on Android. Detect it and hand over to the dedicated installer.
+if [ -n "${TERMUX_VERSION:-}" ] || [ -d /data/data/com.termux/files/usr ] &&    [ -z "${WD_FORCE_GENERIC_INSTALL:-}" ]; then
+  echo "Termux/Android detected - using scripts/termux.sh"
+  exec bash "$ROOT/scripts/termux.sh" "${@:-}"
+fi
+
 PY="${PYTHON:-python3}"
 if ! command -v "$PY" >/dev/null 2>&1; then
   echo "ERROR: python3 not found. Install Python 3.10+ first." >&2
@@ -38,11 +46,11 @@ missing=()
 for t in nmap tshark tcpdump arping candump dig whois curl openssl yara jq \
          subfinder httpx naabu nuclei katana dnsx tlsx ffuf sqlmap nikto; do
   command -v "$t" >/dev/null 2>&1 || missing+=("$t")
- done
+done
 
 if [ ${#missing[@]} -gt 0 ]; then
   echo
-expect_os_pkgs="nmap tshark tcpdump iputils-arping can-utils dnsutils whois curl openssl yara jq nikto"
+  expect_os_pkgs="nmap tshark tcpdump iputils-arping can-utils dnsutils whois curl openssl yara jq nikto"
   echo "missing external tools: ${missing[*]}"
   echo "Install them with your package manager ('$expect_os_pkgs')."
   if command -v apt-get >/dev/null 2>&1; then

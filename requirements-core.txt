@@ -1,0 +1,30 @@
+# WD CYBER TOOLKIT NEO - core runtime requirements (Android / Termux safe)
+#
+# This is the subset that installs cleanly on Termux (aarch64 Android) with
+# nothing but `pkg install python clang`. Everything here is either pure Python
+# or has a small C extension that builds with clang.
+#
+# Deliberately excluded (see requirements.txt for the full desktop set):
+#   scapy        - pure python but pulls iproute2 assumptions; MITM/ARP checks
+#                  fall back to unavailable without it
+#   python-can   - needs compilation; CAN module reports unavailable
+#   pymodbus     - optional; ICS module reports unavailable
+#   asyncua      - heavy; OPC UA checks report unavailable
+#   yara-python  - needs libyara headers; YARA checks report unavailable
+#   psutil       - optional; interface detection falls back to a raw syscall
+#
+# Install with:  pip install -r requirements-core.txt
+
+fastapi>=0.110
+uvicorn>=0.27
+pydantic>=2.5
+SQLAlchemy>=2.0
+argon2-cffi>=23.1
+PyJWT>=2.8
+httpx>=0.27
+Jinja2>=3.1
+reportlab>=4.0
+PyYAML>=6.0
+# cryptography ships a Termux package (pkg install python-cryptography); pip can
+# also build it. Needed for TLS parsing and JWT signing helpers.
+cryptography>=42.0

@@ -95,8 +95,8 @@ report — rather than trusting unit tests alone.
 | Defect | `android/build_apk.sh` failed at step 4/7 with `NullPointerException: Cannot invoke "String.length()" because "<parameter1>" is null`, so no APK had ever been produced. |
 | Cause | The `d8` shipped in `build-tools;android-14` is an **R8 8.2.2-dev snapshot** that crashes on any anonymous inner class. Reproduced with a two-line stand-in class containing one anonymous `AdapterView.OnItemSelectedListener`, so the fault was the tool, not the app. Independent of `--min-api`, `--no-desugaring`, `-source/-target 8` and every `-g` debug-info setting. |
 | Fix | `build_apk.sh` uses a **released R8** (`com.android.tools.r8.D8` from Google's Maven repository) when one is present and falls back to build-tools' `d8` otherwise. `android/prepare_sdk.sh` fetches build-tools, the platform jar and that R8, so the build is reproducible on a clean host. |
-| Verified | `BUILD OK` — `dist/wd-neo.apk`, 58 719 bytes, verified with APK Signature Scheme v2 and v3, `zipalign -c` clean, `aapt2 dump badging` reports `sh.testssl.wdneo` 1.0.0 (minSdk 24, targetSdk 34) and a launchable `MainActivity`. The rebuild is byte-size stable, and its SHA-256 is published beside the artefact. |
-| Test | `android/run_harness.sh` drives the packaged `Json`/`HttpClient`/`WdApi` classes against the live API: **29/29 checks pass** (two-stage unlock, wrong-shortcut and wrong-PIN rejection, 10 templates, 10 engines, scope accept/reject, authorization, assessment + job, PDF, localised MD, audit chain, logout revocation). |
+| Verified | `BUILD OK` — `dist/wd-neo.apk`, 58 719 bytes at 1.3.0 (62 815 at 1.4.0, which adds the DETECT flow), verified with APK Signature Scheme v2 and v3, `zipalign -c` clean, `aapt2 dump badging` reports `sh.testssl.wdneo` 1.0.0 (minSdk 24, targetSdk 34) and a launchable `MainActivity`. The rebuild is byte-size stable, and its SHA-256 is published beside the artefact. |
+| Test | `android/run_harness.sh` drives the packaged `Json`/`HttpClient`/`WdApi` classes against the live API: **29/29 checks pass** at 1.3.0 (**30/30** at 1.4.0, which adds the `GET /api/network` discovery check) (two-stage unlock, wrong-shortcut and wrong-PIN rejection, 10 templates, 10 engines, scope accept/reject, authorization, assessment + job, PDF, localised MD, audit chain, logout revocation). |
 
 ---
 
@@ -120,7 +120,7 @@ per-engine dump; the pytest module is what CI enforces.
 ```
 engines registered : 10 / 10          check ids declared : 78 (all unique)
 engine import errors: 0
-full test suite    : 197 passed
+full test suite    : 197 passed  (at 1.3.0; 227 at 1.4.0)
 E2E over real HTTP : 10 / 10 templates PASS
 report sections    : 12 / 12 in English and Indonesian
 ```

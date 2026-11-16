@@ -3,6 +3,87 @@
 All notable changes to WD CYBER TOOLKIT NEO. Versions follow the application's own
 `APP_VERSION` in `backend/config.py`.
 
+## 1.4.0 — 2026-11-16
+
+Android access release. The platform now runs *on the phone* under Termux, and the APK knows how to
+reach it without the operator typing an address. Every number below was read back from a command
+that was actually executed on this host, not estimated.
+
+### Added
+
+- **`backend/platform_utils.py`** — one platform abstraction for interface enumeration with an
+  explicit fallback chain: `ip -br addr` → `ip addr show` → `ifconfig -a` → `psutil` →
+  `ioctl(SIOCGIFCONF/SIOCGIFADDR)`. The last link is a raw syscall, so an Android phone with no
+  `iproute2` installed can still report its own addresses. Every caller gets real data or an empty
+  result *with a reason*; nothing is fabricated.
+- **`GET /api/network`** — a deliberately **unauthenticated** discovery endpoint. A client has to
+  learn the console URL before it can hold a token, so this returns addressing facts only
+  (`platform`, `port`, `bind_host`, `urls`, `on_device_url`, `lan_url`, `primary_lan_ip`,
+  `interface_source`, `has_iproute2`, `can_utils`, `instance`, `version`) — no scope, no findings, no
+  secrets. `on_device_url` is always loopback-first, because an APK sitting next to a Termux console
+  must dial `127.0.0.1`, not the phone's LAN address.
+- **`scripts/termux.sh`** — one-command Termux installer (`pkg` instead of `apt`, `clang` for the C
+  extensions, no venv, `requirements-core.txt`, and a `termux-wake-lock` so the server survives
+  screen-off). Supports `--install`, `--run`, `--check` and `--help`; `--check` changes nothing.
+- **`requirements-core.txt`** — the Android/Termux-safe subset. It is a strict subset of
+  `requirements.txt` (a test asserts this) and deliberately omits `scapy`, `python-can`,
+  `pymodbus`, `asyncua`, `yara-python` and `psutil`, which either fail to build on aarch64 Android or
+  are pointless on a phone. The affected modules then report `unavailable` with the reason instead
+  of pretending to run.
+- **`docs/TERMUX.md`** — install, the four real Android differences, root/`tsu` for live capture, how
+  to point the APK at a console, first login, recommended phone setup, troubleshooting.
+- **`scripts/termux_proof.py`** — proves the stack under a simulated Termux (hides `ip`/`ss`/
+  `ifconfig` from `PATH`, sets the Android markers) and then drives the real API end to end.
+- **`tests/test_termux_android.py`** — 30 tests covering detection, the fallback chain, LAN-URL
+  shape, the requirement split, shell-script syntax, and the APK default/detect regressions.
+
+### Changed
+
+- **`backend/capabilities.py`** now delegates interface and CAN detection to `platform_utils`, and
+  `/api/capabilities` gained `platform`, `is_termux`, `is_android`, `interface_source`,
+  `primary_lan_ip`, `lan_urls` and `platform_notes`. The UI no longer shows zero interfaces on a
+  phone with no explanation.
+- **`scripts/install.sh`** detects Termux and `exec`s `scripts/termux.sh` instead of printing advice
+  it never followed.
+- **`scripts/run.sh`** prints the addresses a client can actually use (`this device` and `LAN`), via
+  the same `platform_utils.lan_urls()` helper `/api/network` uses, so the two cannot drift apart.
+- **The APK default server is now `http://127.0.0.1:8000`.** It used to be `10.0.2.2:8000`, which is
+  the *emulator's* alias for the host machine and is dead on real hardware — the app opened offline
+  on every phone. `10.0.2.2` is kept only as an emulator-only shortcut, and an install upgraded from
+  an older build has the dead value healed once on first launch.
+- **New DETECT button** on the login screen: tries the on-device loopback, the emulator alias when
+  actually emulated, then asks any console it reaches `GET /api/network` for the addresses it
+  advertises, and saves the first one whose `/api/health` answers. If nothing answers it says so and
+  names the port it tried.
+- **`MainActivity.async()` discarded its `Job<T>` return value**, so any value-returning callback got
+  `null`. Added `asyncValue()` for the value path; `async()` is now documented as side-effect-only.
+
+### Fixed
+
+- **`run.sh` lost its executable bit** in the working tree (`100755` → `100644`); restored.
+- **The core harness only passed on a database that had already been rotated.** It rotated the
+  bootstrap password to `Harness-Rotated-Pass-2026` and then logged in again with the *old* value,
+  so the wrong-PIN check failed with HTTP 401 on a fresh database. It now tracks the current
+  password. Verified on a brand-new database: **30/30**.
+
+### Tests
+
+- Full suite: **227 passed** (`python3 -m pytest -q`) — 197 at 1.3.0 plus the 30 new Termux tests.
+- `python3 tests/audit_all_engines.py` — **0 / 10 engines with problems**.
+- `python3 scripts/termux_proof.py` — **30 passed, 0 failed**.
+- `android/run_harness.sh` — **30 / 30 checks**, on a fresh database and again on a re-run. The new
+  check is `network discovery answers unauthenticated`, which is what DETECT depends on; the other 29
+  are unchanged.
+
+### Known limits
+
+- No Android device or emulator exists in the build environment (no KVM), so Termux is proven by
+  simulating its environment. Real-hardware behaviour — `pkg` resolution, a phone's actual interface
+  names, wake-lock under OEM battery savers — is implemented but unconfirmed on a device.
+- The `MainActivity` UI itself (the DETECT button wiring) is compiled into the signed APK and its
+  bytecode is inspected, but the button has not been *pressed* on hardware. The client call it makes
+  is covered by the harness.
+
 ## 1.3.0 — 2026-11-16
 
 Engine-layer correctness release plus the native Android client. Every item below was reproduced on

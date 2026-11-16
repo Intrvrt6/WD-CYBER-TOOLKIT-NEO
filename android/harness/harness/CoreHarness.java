@@ -71,6 +71,21 @@ public final class CoreHarness {
                     + " version=" + Json.str(h, "version"));
         });
 
+        // The APK's DETECT button calls this BEFORE it has a token, so it must
+        // answer unauthenticated and advertise an on-device URL to try.
+        check("network discovery answers unauthenticated", () -> {
+            Map<String, Object> n = api.network();
+            expect(!Json.str(n, "platform").isEmpty(), "platform missing");
+            List<Object> urls = Json.arr(n, "urls");
+            expect(urls != null && !urls.isEmpty(), "no candidate urls");
+            String onDevice = Json.str(n, "on_device_url");
+            expect(onDevice.startsWith("http://127.0.0.1:"),
+                   "on_device_url should be loopback, got " + onDevice);
+            System.out.println("      platform=" + Json.str(n, "platform")
+                    + " on_device=" + onDevice
+                    + " lan=" + Json.str(n, "lan_url"));
+        });
+
         check("unauthenticated request is rejected with 401", () -> {
             try {
                 api.scope();
@@ -103,10 +118,12 @@ public final class CoreHarness {
             }
         }
         if (!ok) throw lastErr;
-        final String pw = effectivePass;
+        // Mutable: the rotation check below may replace the working password, and
+        // later checks must log in with the CURRENT one, not the bootstrap value.
+        final String[] pwRef = { effectivePass };
 
         check("stage 1 returns a token", () -> {
-            Map<String, Object> r = api.stage1(user, pw, shortcut);
+            Map<String, Object> r = api.stage1(user, pwRef[0], shortcut);
             expect(api.authenticated(), "token stored");
             expect(Json.str(r, "token").length() > 20, "plausible token length");
             System.out.println("      stage after stage1 = " + api.stage());
@@ -115,7 +132,7 @@ public final class CoreHarness {
         check("stage 1 rejects a bad shortcut", () -> {
             WdApi bad = new WdApi(base);
             boolean threw = false;
-            try { bad.stage1(user, pw, "WD-INCORRECT123"); }
+            try { bad.stage1(user, pwRef[0], "WD-INCORRECT123"); }
             catch (HttpClient.ApiException e) { threw = true;
                 expect(e.getMessage().contains("INVALID_CREDENTIALS") || e.status == 401,
                        "server message: " + e.getMessage()); }
@@ -137,7 +154,8 @@ public final class CoreHarness {
                 // Rotate to a FIXED value, not a prefix of the current one: a
                 // prefix would grow on every harness run (Rotated-, Rotated2-...)
                 // and the next run could no longer guess the password.
-                api.changePassword(pw, HARNESS_PASSWORD);
+                api.changePassword(pwRef[0], HARNESS_PASSWORD);
+                pwRef[0] = HARNESS_PASSWORD;
                 Map<String, Object> after = api.me();
                 expect(!Json.bool(Json.obj(after, "user"), "must_change_password"),
                        "flag should clear after rotation");
@@ -149,7 +167,7 @@ public final class CoreHarness {
 
         check("stage 2 rejects a wrong PIN", () -> {
             WdApi other = new WdApi(base);
-            other.stage1(user, pw, shortcut);
+            other.stage1(user, pwRef[0], shortcut);
             boolean threw = false;
             try { other.stage2("00000000".equals(pin) ? "11111111" : "00000000"); }
             catch (HttpClient.ApiException e) { threw = true; }

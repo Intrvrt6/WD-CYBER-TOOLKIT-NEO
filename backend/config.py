@@ -48,7 +48,7 @@ SAMPLES_DIR = BASE_DIR / "samples"
 
 DATABASE_URL = os.environ.get("WD_DATABASE_URL", f"sqlite:///{DATA_DIR / 'wd_cyber.db'}")
 INSTANCE_NAME = os.environ.get("WD_INSTANCE_NAME", "WD CYBER TOOLKIT NEO")
-APP_VERSION = "1.3.0"
+APP_VERSION = "1.4.0"
 
 # --- session / authorization lifetime -------------------------------------
 SESSION_TTL_MINUTES = int(os.environ.get("WD_SESSION_TTL_MINUTES", "480"))
@@ -96,6 +96,8 @@ def reload() -> None:
     global DEFAULT_CMD_TIMEOUT, MAX_CMD_TIMEOUT, LAB_BIND_HOST
     global ARTAX_ENABLED, ARTAX_BASE_URL, ARTAX_API_KEY, ARTAX_MODEL, ARTAX_TIMEOUT
     global ARTAX_MAX_CONTEXT_FINDINGS
+    global BOOTSTRAP_USER, BOOTSTRAP_PASSWORD, BOOTSTRAP_PIN, BOOTSTRAP_SHORTCUT
+    global FORCE_PASSWORD_CHANGE
 
     load_dotenv()
     DATA_DIR = Path(os.environ.get("WD_DATA_DIR", BASE_DIR / "database"))
@@ -119,3 +121,8 @@ def reload() -> None:
     ARTAX_MODEL = os.environ.get("WD_ARTAX_MODEL", "artax")
     ARTAX_TIMEOUT = int(os.environ.get("WD_ARTAX_TIMEOUT", "120"))
     ARTAX_MAX_CONTEXT_FINDINGS = int(os.environ.get("WD_ARTAX_MAX_CONTEXT_FINDINGS", "40"))
+    BOOTSTRAP_USER = os.environ.get("WD_ADMIN_USER")
+    BOOTSTRAP_PASSWORD = os.environ.get("WD_ADMIN_PASSWORD")
+    BOOTSTRAP_PIN = os.environ.get("WD_ADMIN_PIN")
+    BOOTSTRAP_SHORTCUT = os.environ.get("WD_SHORTCUT")
+    FORCE_PASSWORD_CHANGE = os.environ.get("WD_FORCE_PASSWORD_CHANGE", "1") == "1"

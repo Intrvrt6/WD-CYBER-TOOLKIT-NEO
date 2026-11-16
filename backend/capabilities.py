@@ -10,7 +10,7 @@ import re
 import shutil
 from functools import lru_cache
 
-from backend import runner
+from backend import platform_utils, runner
 
 CLI_TOOLS = {
     "nmap": ["nmap", "--version"],
@@ -167,27 +167,17 @@ def capture_interfaces() -> list[str]:
 
 
 def interfaces() -> list[dict]:
-    res = runner.run(["ip", "-br", "addr"], timeout=10)
-    rows = []
-    for line in (res.stdout or "").splitlines():
-        parts = line.split()
-        if len(parts) >= 2:
-            rows.append({"name": parts[0], "state": parts[1],
-                         "addresses": [p for p in parts[2:] if p not in ("UP", "DOWN")]})
-    return rows
+    """Network interfaces, via the platform abstraction.
+
+    Delegated to backend.platform_utils so Android/Termux (which ships no
+    iproute2) still reports its real addresses through a syscall fallback.
+    """
+    return platform_utils.interfaces()
 
 
 def can_interfaces() -> dict:
     """Detect SocketCAN interfaces, including virtual vcan devices."""
-    res = runner.run(["ip", "-details", "link", "show"], timeout=10)
-    found = []
-    current = None
-    for line in (res.stdout or "").splitlines():
-        if line and not line.startswith(" "):
-            current = line.split(":")[1].strip().split("@")[0] if ":" in line else None
-        if "can" in line and current:
-            found.append({"name": current, "detail": line.strip()})
-    return {"interfaces": found, "can_utils": shutil.which("candump") is not None}
+    return platform_utils.can_interfaces()
 
 
 def usb_available() -> dict:
@@ -233,4 +223,11 @@ def report() -> dict:
         "can": can_interfaces(),
         "usb": usb_available(),
         "raw_socket": raw_socket_ok(),
+        "platform": platform_utils.platform_label(),
+        "is_termux": platform_utils.is_termux(),
+        "is_android": platform_utils.is_android(),
+        "interface_source": platform_utils.interface_source(),
+        "primary_lan_ip": platform_utils.primary_lan_ip(),
+        "lan_urls": platform_utils.lan_urls(),
+        "platform_notes": platform_utils.capability_notes(),
     }

@@ -36,6 +36,19 @@ def caps():
     return capabilities.report()
 
 
+@router.get("/network")
+def network():
+    """Discovery endpoint: how a client should reach this console.
+
+    Deliberately unauthenticated. The Android client has to learn the server URL
+    *before* it can log in, and on a phone the correct answer is usually
+    127.0.0.1 (the console runs in Termux on the same device). Exposes only
+    addressing facts -- no secrets, no scope, no findings.
+    """
+    from backend import platform_utils
+    return platform_utils.network_info()
+
+
 @router.get("/modules")
 def modules():
     import engines

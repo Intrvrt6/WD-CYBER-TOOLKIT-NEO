@@ -48,6 +48,17 @@ public class MainActivity extends Activity {
     private static final String K_SERVER = "server";
     private static final String K_USER = "user";
 
+    /**
+     * Default console address. 127.0.0.1 is correct whenever the console runs on
+     * this same phone (Termux), which is the common Android case. The old default
+     * was 10.0.2.2 -- the *emulator's* host alias -- so on real hardware the app
+     * opened offline with nothing listening there.
+     */
+    private static final String DEFAULT_SERVER = "http://127.0.0.1:8000";
+
+    /** Emulator-only alias for the host machine; offered as a shortcut, not a default. */
+    private static final String EMULATOR_HOST_ALIAS = "http://10.0.2.2:8000";
+
     private final Handler ui = new Handler(Looper.getMainLooper());
     private final ExecutorService io = Executors.newSingleThreadExecutor();
 
@@ -59,7 +70,7 @@ public class MainActivity extends Activity {
     private View stage1Box, stage2Box;
     private EditText inServer, inUser, inPass, inShortcut, inPin, inScope, inTargets, inArtax;
     private TextView gateMsg1, gateMsg2, gateStatus;
-    private Button btnConnect, btnStage1, btnBack, btnStage2;
+    private Button btnConnect, btnStage1, btnBack, btnStage2, btnDetect;
 
     // shell
     private TextView badgeStage, badgeStop, dashState, dashBody, scopeBody,
@@ -85,7 +96,13 @@ public class MainActivity extends Activity {
         bind();
         wire();
 
-        String server = prefs.getString(K_SERVER, "http://10.0.2.2:8000");
+        String server = prefs.getString(K_SERVER, DEFAULT_SERVER);
+        // A phone upgraded from an older build still has the emulator alias saved.
+        // On real hardware that address is dead, so heal it once, automatically.
+        if (EMULATOR_HOST_ALIAS.equals(server) && !isEmulator()) {
+            server = DEFAULT_SERVER;
+            prefs.edit().putString(K_SERVER, server).apply();
+        }
         String user = prefs.getString(K_USER, "");
         inServer.setText(server);
         inUser.setText(user);
@@ -98,6 +115,25 @@ public class MainActivity extends Activity {
     protected void onDestroy() {
         io.shutdownNow();
         super.onDestroy();
+    }
+
+    /**
+     * True when running inside an Android emulator.
+     *
+     * Only there does 10.0.2.2 reach the host machine, so only there is it a
+     * sensible address. Checked from the build fingerprint, which is the
+     * documented signal (Build.HARDWARE/FINGERPRINT contain generic|sdk|emulator).
+     */
+    private boolean isEmulator() {
+        String fp = android.os.Build.FINGERPRINT == null ? "" : android.os.Build.FINGERPRINT;
+        String hw = android.os.Build.HARDWARE == null ? "" : android.os.Build.HARDWARE;
+        String model = android.os.Build.MODEL == null ? "" : android.os.Build.MODEL;
+        return fp.startsWith("generic")
+                || fp.contains("emulator")
+                || hw.contains("goldfish")
+                || hw.contains("ranchu")
+                || model.contains("sdk")
+                || model.contains("Emulator");
     }
 
     private void bind() {
@@ -116,6 +152,7 @@ public class MainActivity extends Activity {
         gateMsg1 = findViewById(R.id.gate_msg1);
         gateMsg2 = findViewById(R.id.gate_msg2);
         gateStatus = findViewById(R.id.gate_status);
+        btnDetect = findViewById(R.id.btn_detect);
         btnConnect = findViewById(R.id.btn_connect);
         btnStage1 = findViewById(R.id.btn_stage1);
         btnBack = findViewById(R.id.btn_back);
@@ -140,6 +177,7 @@ public class MainActivity extends Activity {
     }
 
     private void wire() {
+        btnDetect.setOnClickListener(v -> doDetect());
         btnConnect.setOnClickListener(v -> doConnect());
         btnStage1.setOnClickListener(v -> doStage1());
         btnStage2.setOnClickListener(v -> doStage2());
@@ -233,17 +271,49 @@ public class MainActivity extends Activity {
     /** Work executed on the IO thread for its side effects only. */
     private interface Task { void run() throws Exception; }
 
-    /** Run on the IO thread; `done` runs on the UI thread (null on failure). */
+    /**
+     * Run on the IO thread; `done` runs on the UI thread.
+     *
+     * Note: this overload is for side-effect-only callbacks -- the Job's return
+     * value is intentionally discarded. Use asyncValue() when the result is
+     * needed, otherwise the computed value is silently lost.
+     */
     private <T> void async(Job<T> work, UiAction done) {
         io.execute(() -> {
-            T value;
             try {
-                value = work.run();
+                work.run();
             } catch (final Exception e) {
                 if (done != null) ui.post(() -> deliver(done, e));
                 return;
             }
             if (done != null) ui.post(() -> deliver(done, null));
+        });
+    }
+
+    /** Callback that receives the Job's value on the UI thread. */
+    private interface UiValue<T> { void run(T value, Exception error) throws Exception; }
+
+    /** Run on the IO thread and hand BOTH the value and any error to the UI thread. */
+    private <T> void asyncValue(final Job<T> work, final UiValue<T> done) {
+        io.execute(() -> {
+            T value = null;
+            Exception failure = null;
+            try {
+                value = work.run();
+            } catch (Exception e) {
+                failure = e;
+            }
+            final T finalValue = value;
+            final Exception finalFailure = failure;
+            if (done != null) {
+                ui.post(() -> {
+                    try {
+                        done.run(finalValue, finalFailure);
+                    } catch (Exception renderFailure) {
+                        toast("ui: " + err(renderFailure));
+                    }
+                });
+            }
         });
     }
 
@@ -288,6 +358,91 @@ public class MainActivity extends Activity {
     }
 
     // ================================================================ GATE ====
+
+    /**
+     * Find a console without the operator having to know its address.
+     *
+     * Tries the on-device loopback first (the normal Termux case), then the
+     * emulator alias, then whatever candidates /api/network reports from each
+     * reachable console. The first URL that answers /api/health wins and is
+     * saved; nothing is assumed to be up.
+     */
+    private void doDetect() {
+        btnDetect.setEnabled(false);
+        gateMsg1.setText(getString(R.string.msg_checking));
+        final String typed = HttpClient.normalizeBase(inServer.getText().toString());
+        asyncValue(() -> {
+            List<String> candidates = new ArrayList<>();
+            if (!typed.isEmpty()) candidates.add(typed);
+            if (!candidates.contains(DEFAULT_SERVER)) candidates.add(DEFAULT_SERVER);
+            if (isEmulator() && !candidates.contains(EMULATOR_HOST_ALIAS))
+                candidates.add(EMULATOR_HOST_ALIAS);
+
+            // Ask each reachable console which other addresses it advertises.
+            List<String> discovered = new ArrayList<>();
+            for (String base : new ArrayList<>(candidates)) {
+                try {
+                    WdApi probe = new WdApi(base);
+                    probe.http().setTimeouts(4000, 8000);
+                    probe.health();
+                    try {
+                        Map<String, Object> net = probe.network();
+                        Object urls = net.get("urls");
+                        if (urls instanceof List) {
+                            for (Object u : (List<?>) urls) {
+                                String su = HttpClient.normalizeBase(String.valueOf(u));
+                                if (!su.isEmpty() && !discovered.contains(su)) discovered.add(su);
+                            }
+                        }
+                    } catch (Exception ignored) {
+                        // Older console without /api/network: the base already works.
+                    }
+                } catch (Exception ignored) {
+                    // Not listening here; try the next candidate.
+                }
+            }
+            for (String u : discovered) if (!candidates.contains(u)) candidates.add(u);
+
+            for (String base : candidates) {
+                try {
+                    WdApi probe = new WdApi(base);
+                    probe.http().setTimeouts(4000, 8000);
+                    Map<String, Object> h = probe.health();
+                    return base + "|" + Json.str(h, "instance") + "|" + Json.str(h, "version");
+                } catch (Exception ignored) {
+                    // keep looking
+                }
+            }
+            return "";
+        }, (result, error) -> {
+            btnDetect.setEnabled(true);
+            if (result == null || result.isEmpty()) {
+                gateMsg1.setText(getString(R.string.msg_offline)
+                        + " (no console on 127.0.0.1:" + portOf(DEFAULT_SERVER) +
+                        " - start it with: bash scripts/termux.sh)");
+                return;
+            }
+            String[] parts = result.split("\u007c", -1);
+            String base = parts[0];
+            api = new WdApi(base);
+            api.http().setTimeouts(12000, 60000);
+            inServer.setText(base);
+            prefs.edit().putString(K_SERVER, base).apply();
+            gateStatus.setText(base);
+            String label = parts.length > 1 && !parts[1].isEmpty() ? parts[1] : "console";
+            String ver = parts.length > 2 && !parts[2].isEmpty() ? " v" + parts[2] : "";
+            gateMsg1.setText("found " + label + ver);
+        });
+    }
+
+    private static String portOf(String base) {
+        try {
+            java.net.URI u = java.net.URI.create(base);
+            return String.valueOf(u.getPort() == -1 ? 80 : u.getPort());
+        } catch (Exception e) {
+            return "8000";
+        }
+    }
 
     private void doConnect() {
         final String server = HttpClient.normalizeBase(inServer.getText().toString());
