@@ -1,35 +1,40 @@
+# --- Python -----------------------------------------------------------------
 .venv/
 __pycache__/
 *.py[cod]
 .pytest_cache/
-.env
-database/*.db
-database/*.db-wal
-database/*.db-shm
-database/bootstrap_credentials.txt
-evidence/*
-!evidence/.gitkeep
-reports/*
-!reports/.gitkeep
-*.log
-.DS_Store
 
-# local runtime state and private material
-private/
+# --- secrets and local configuration ---------------------------------------
+.env
+
+# --- runtime state (never commit a live database or its credentials) -------
 *.db
+*.db-wal
+*.db-shm
 database/*.db
 database/*.db-wal
 database/*.db-shm
 database/bootstrap_credentials.txt
 database/nuclei_*.jsonl
 .keys/
-
-# local run dirs created by helper scripts
 .run/
-ui-proof*/\.run/
 
-# Android client build output. `dist/` is kept so the installable APK ships with
-# the repo; `build/` and the generated release keystore are reproducible state.
+# --- generated assessment output -------------------------------------------
+evidence/*
+!evidence/.gitkeep
+reports/*
+!reports/.gitkeep
+
+# --- private / sensitive engagement material -------------------------------
+private/
+
+# --- logs and editor noise -------------------------------------------------
+*.log
+.DS_Store
+
+# --- Android client ---------------------------------------------------------
+# `dist/` is committed so the installable APK ships with the repo.
+# `build/`, the generated release keystore and javac argfiles are reproducible.
 android/build/
 android/keystore/
 android/dist/*.idsig
