@@ -3,6 +3,44 @@
 All notable changes to WD CYBER TOOLKIT NEO. Versions follow the application's own
 `APP_VERSION` in `backend/config.py`.
 
+## 1.2.1 — 2026-11-16
+
+Second security release, from the same adversarial review's remaining findings. All six were live
+at `1.2.0`; each is covered by `tests/test_review_second_pass.py` and re-proved live
+(`live-proof-6/LIVE-PROOF-6.md`, 38/38).
+
+### Fixed
+
+- **Scope matching was a bare string prefix (scope escape).** A grant of `https://example.com`
+  covered `https://example.com@evil.tld/` (`example.com` as *userinfo*), `https://example.com.attacker.tld/`
+  and `https://example.com.evil.tld:8443/p`, and a registered `/24` covered a requested `/8`. A
+  harness proved the outbound consequence: the platform fetched an attacker host and stored its
+  marker in its own evidence directory while the audit log recorded only the in-scope name. Matching
+  is now origin + path for URLs, subdomain-only for domains, and subnet containment for IP ranges.
+- **Audit tail truncation verified as valid.** Deleting the newest events left a shorter but
+  self-consistent chain, so the natural cover-up went undetected. The expected tail (`seq`, `head`)
+  is now persisted in `state_kv` outside `audit_events`, written in the same transaction as each
+  append, and compared by `/api/audit/verify` (`"tail truncated: ..."`, plus `anchored: false` for
+  pre-anchor chains).
+- **`viewer` could authorize, create and execute.** Every execute route used the stage-2 dependency
+  without an RBAC check, so a "read-only" role could spend authorizations and launch scans.
+  `require_stage2_role(...)` now guards authorize/create/run; the viewer keeps read-only access and
+  halt stays open by design.
+- **Emergency stop did not block assessment creation.** `require_clear` was missing on
+  `POST /api/assessments`, so work could be queued behind an active halt and would fire on clear.
+- **Credential rotation left other sessions valid.** Changing the password or PIN now revokes every
+  other session of that operator and keeps the caller's, so a stolen token does not outlive the
+  recovery action.
+- **`kv()` trusted any value starting with `<` as markup.** Console key/value panels interpolated
+  such values into `innerHTML` unescaped; escaping is now unconditional with an explicit
+  `{html: true}` opt-in for real markup.
+
+### Changed
+
+- `APP_VERSION` is `1.2.1`; `docs/SECURITY.md` documents semantic scope matching, the audit anchor
+  and its limits, the viewer role's actual capability, and session revocation on credential change.
+- Test suite is 151 tests.
+
 ## 1.2.0 — 2026-11-16
 
 Security release. Every item below was found by an independent adversarial review of the

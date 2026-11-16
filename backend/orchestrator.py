@@ -190,7 +190,9 @@ def _run_job(job_id: str, assessment_id: str) -> None:
             "by_source": _count_by(results, "source"),
             "duration_s": round(time.time() - started, 2),
             "checks_expected": [c[0] for c in engine.checks],
-            "checks_reported": sorted({r.check_id for r in results}),
+            "checks_reported": _declared_reported(engine, results),
+            "checks_executed": sorted({r.check_id for r in results}),
+            "coverage": _coverage(engine, results),
         }
         a.status = "aborted" if runner.executor.stopped() else "completed"
         a.ended_at = utcnow()
@@ -222,6 +224,35 @@ def _run_job(job_id: str, assessment_id: str) -> None:
     finally:
         db.close()
         _drop_job(job_id)
+
+
+def _declared_reported(engine, results: list[Result]) -> list[str]:
+    """Which DECLARED checks produced at least one result.
+
+    Engines may emit conditional sub-findings with derived ids (e.g. NET-02b) that
+    belong to a parent check. Coverage must be measured against the declared
+    checklist, otherwise a module could appear to cover 10/8 checks.
+    """
+    declared = [c[0] for c in engine.checks]
+    produced = {str(r.check_id) for r in results}
+    return [cid for cid in declared if cid in produced or any(
+        cid_ == cid or cid_.startswith(cid + "-") or cid_.rstrip("0123456789") == cid
+        for cid_ in produced)]
+
+
+def _coverage(engine, results: list[Result]) -> dict:
+    """Declared-checklist coverage and the reason any declared check is missing."""
+    declared = [c[0] for c in engine.checks]
+    reported = _declared_reported(engine, results)
+    missing = [cid for cid in declared if cid not in reported]
+    unavailable = sorted({r.check_id for r in results if r.status == "unavailable"})
+    return {
+        "declared": len(declared),
+        "reported": len(reported),
+        "missing": missing,
+        "percent": round(100.0 * len(reported) / len(declared), 1) if declared else 0.0,
+        "unavailable_checks": unavailable,
+    }
 
 
 def _set_progress(db, job: Job, pct: int) -> None:

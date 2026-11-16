@@ -64,7 +64,12 @@ No plaintext password, PIN or shortcut is ever stored. `security.hash_secret` re
 
 Three independent gates must pass before any active test runs:
 
-1. **Scope registry** — the target (or a covering CIDR/domain/URL prefix) is registered.
+1. **Scope registry** — the target is registered or covered by a registered entry. Matching is
+   semantic, not textual: an IP or range must be contained in the registered network (a requested
+   `/8` is **not** covered by a registered `/24`), a domain must equal or be a subdomain of the
+   entry, and a URL must share the entry's origin *and* stay under its path.
+   `https://example.com@evil.tld/` and `https://example.com.attacker.tld/` are therefore outside a
+   grant of `https://example.com`.
 2. **Authorization token** — exists, `confirmed`, unexpired, not revoked, **granted to the
    operator who is running the test** (`AUTHZ_FOREIGN` otherwise), and its `targets` list is a
    superset of the requested targets (`AUTHZ_TARGET_MISMATCH` otherwise).
@@ -82,7 +87,9 @@ stop. They were previously reachable with a stage-1 session and no scope check a
 
 - Created on stage 1, TTL `WD_SESSION_TTL_MINUTES` (default 480).
 - Raised to stage 2 in place; the token does not change (so the client keeps one credential).
-- Revoked by: explicit logout, emergency stop, or expiry.
+- Revoked by: explicit logout, emergency stop, expiry, or a credential rotation performed by
+  *another* session of the same operator. Rotating the password or PIN keeps the caller's own
+  session and revokes the rest, so a stolen bearer token does not survive the recovery step.
 - Resolution checks `revoked` and normalises naive SQLite datetimes to UTC before comparing.
 
 ## 7. Role-based access control
@@ -91,9 +98,12 @@ stop. They were previously reachable with a stage-1 session and no scope check a
 |---|---|
 | `admin` | everything, plus operator creation and shortcut issuance |
 | `operator` | scope management, authorizations, assessments, reports |
-| `viewer` | read-only browsing (no scope writes, no execution) |
+| `viewer` | read-only browsing: no scope writes, no authorizations, no assessment creation or execution |
 
-RBAC is enforced through the `require_role(...)` dependency; there is no client-side authorization.
+RBAC is enforced through `require_stage2_role(...)` on every execute path (authorize, create, run),
+which checks the role **and** the stage-2 / rotated-password gates; read-only routes use
+`current_principal` or `require_role(...)`. There is no client-side authorization. Halt stays open to
+any authenticated operator by design.
 
 ## 8. Emergency stop as a safety control
 
@@ -118,6 +128,13 @@ hash_n = sha256( hash_{n-1} || canonical_json({seq, ts, actor, action, target, d
   both claim the same sequence number and manufacture a false tamper signal.
 - `verify_chain()` recomputes from genesis and reports the first broken `seq` and the reason.
   Detection is retrospective: it proves that an alteration happened, it does not prevent one.
+- **Tail truncation is detectable.** Deleting the newest rows leaves a shorter but self-consistent
+  chain, so the expected tail (`{seq, head}`) is also persisted in `state_kv` — outside
+  `audit_events` — in the same transaction as each append. `verify_chain()` compares against it,
+  returns `{valid: false, reason: "tail truncated: ..."}` when rows have gone missing, and reports
+  `anchored: false` for chains written before the anchor existed. For truncation evidence that
+  survives database access, ship the head hash to external storage (syslog, the daily report or an
+  append-only bucket): the anchor defeats casual deletion, not an attacker who rewrites both tables.
 - Exports: JSON (full detail) and CSV (flat, for SIEM ingestion).
 
 Because the chain is computed over every field of every event, altering an actor, action, target,

@@ -34,9 +34,13 @@ const UI = (() => {
     el.innerHTML = `<table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
   }
 
-  function kv(el, pairs) {
+  function kv(el, pairs, opts) {
+    // Everything is escaped unless the caller explicitly asks for raw markup.
+    // The old "a value starting with < is trusted HTML" rule turned any echoed
+    // target string into live markup; the callers never needed it.
+    const raw = !!(opts && opts.html);
     el.innerHTML = pairs.map(([k, v]) =>
-      `<div class="k">${esc(k)}</div><div class="v">${v && String(v).startsWith('<') ? v : esc(v)}</div>`
+      `<div class="k">${esc(k)}</div><div class="v">${raw ? (v == null ? '' : v) : esc(v)}</div>`
     ).join('');
   }
 

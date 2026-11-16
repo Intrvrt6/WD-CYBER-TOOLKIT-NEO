@@ -47,8 +47,19 @@ def _ts_repr(value) -> str:
     return value.strftime("%Y-%m-%dT%H:%M:%S.%f")
 
 
+ANCHOR_KEY = "audit_anchor"
+
+
 def record(action: str, actor: str = "system", target: str = "", detail: dict | None = None,
            db=None) -> dict[str, Any]:
+    """Append one event and advance the out-of-table anchor.
+
+    The hash chain alone cannot detect *tail truncation*: delete the newest rows
+    and the remaining chain still recomputes as valid, so the most natural
+    cover-up (removing the events that record your own actions) was invisible.
+    The anchor lives in `state_kv` rather than in `audit_events`, is written in
+    the same transaction as the append, and is compared by ``verify_chain``.
+    """
     own = db is None
     if own:
         db = SessionLocal()
@@ -66,11 +77,23 @@ def record(action: str, actor: str = "system", target: str = "", detail: dict | 
             ev = AuditEvent(seq=seq, ts=ts, actor=actor, action=action, target=target,
                             detail=detail or {}, prev_hash=prev_hash, hash=h)
             db.add(ev)
+            _set_anchor(db, seq, h)
             db.commit()
             return {"seq": seq, "hash": h, "ts": ts.isoformat(), "action": action}
     finally:
         if own:
             db.close()
+
+
+def _set_anchor(db, seq: int, head: str) -> None:
+    """Persist the expected tail (seq + head hash) outside the events table."""
+    from backend.database import kv_set
+    kv_set(db, ANCHOR_KEY, {"seq": seq, "head": head, "at": utcnow().isoformat()}, commit=False)
+
+
+def get_anchor(db) -> dict[str, Any] | None:
+    from backend.database import kv_get
+    return kv_get(db, ANCHOR_KEY)
 
 
 def list_events(db, limit: int = 200, action: str | None = None) -> list[dict[str, Any]]:
@@ -118,7 +141,22 @@ def verify_chain(db) -> dict[str, Any]:
             return {"valid": False, "broken_at": e.seq, "reason": "hash mismatch"}
         prev = e.hash
         expected_seq += 1
-    return {"valid": True, "events": len(events), "head": prev}
+    anchor = get_anchor(db)
+    if anchor is None:
+        # Chains written before the anchor existed cannot be checked against it;
+        # say so instead of implying truncation protection.
+        return {"valid": True, "events": len(events), "head": prev, "anchored": False,
+                "note": "no stored anchor: tail truncation is not detectable for this chain"}
+    if len(events) < int(anchor.get("seq", 0)):
+        return {"valid": False, "broken_at": len(events) + 1, "anchored": True,
+                "reason": f"tail truncated: anchor expects seq {anchor.get('seq')}, "
+                          f"last event is {len(events)}",
+                "expected_head": anchor.get("head"), "head": prev}
+    if prev != anchor.get("head"):
+        return {"valid": False, "broken_at": len(events), "anchored": True,
+                "reason": "head hash differs from the stored anchor",
+                "expected_head": anchor.get("head"), "head": prev}
+    return {"valid": True, "events": len(events), "head": prev, "anchored": True}
 
 
 def count(db) -> int:

@@ -89,7 +89,8 @@ def logout(p: Principal = Depends(current_principal), db: OrmSession = Depends(g
 def change_password(body: PasswordIn, p: Principal = Depends(current_principal),
                     db: OrmSession = Depends(get_db)):
     try:
-        return authentication.change_password(db, p.user, body.old_password, body.new_password)
+        return authentication.change_password(db, p.user, body.old_password, body.new_password,
+                                             keep_session_id=p.session.id)
     except AuthError as exc:
         raise HTTPException(status_code=exc.status, detail={"code": exc.code, "message": exc.message})
 
@@ -104,7 +105,8 @@ def change_pin(body: PinIn, p: Principal = Depends(require_stage2),
     satisfy stage 2 themselves - the second factor was self-serviceable.
     """
     try:
-        return authentication.change_pin(db, p.user, body.password, body.new_pin)
+        return authentication.change_pin(db, p.user, body.password, body.new_pin,
+                                        keep_session_id=p.session.id)
     except AuthError as exc:
         raise HTTPException(status_code=exc.status, detail={"code": exc.code, "message": exc.message})
 

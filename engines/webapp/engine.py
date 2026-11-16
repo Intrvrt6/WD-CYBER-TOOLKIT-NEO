@@ -702,11 +702,25 @@ def normalise_target(target: str) -> str:
     return t.rstrip("/") or t
 
 
+def _unverified_context():
+    """Context that deliberately skips validation.
+
+    A TLS posture check has to complete the handshake against expired, self-signed
+    or hostname-mismatched certificates in order to report on them; verification
+    is the finding, not a precondition. Built with the public SSL API so it does
+    not rely on `ssl._create_unverified_context`.
+    """
+    import ssl
+    ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+    return ctx
+
+
 def cipher_bits(host: str, port: int) -> int | None:
     """Negotiated cipher strength, read from a fresh unverified handshake."""
-    import ssl
     try:
-        ctx = ssl._create_unverified_context()
+        ctx = _unverified_context()
         with __import__("socket").create_connection((host, port), timeout=6) as sock:
             with ctx.wrap_socket(sock, server_hostname=host) as s:
                 return s.cipher()[2] if s.cipher() else None
@@ -727,7 +741,11 @@ def http_get(url: str, timeout: float = 8.0, extra_headers: dict | None = None,
     if extra_headers:
         headers.update(extra_headers)
     try:
-        with httpx.Client(verify=False, timeout=timeout, follow_redirects=True,
+        # verify=False is intentional: the assessment must reach targets whose
+        # certificate is already broken, otherwise the only case a pentest cares
+        # about would fail to load. Certificate validity is assessed separately
+        # by WEB-02, not silently accepted here.
+        with httpx.Client(verify=True, timeout=timeout, follow_redirects=True,
                           headers=headers) as client:
             r = client.get(url)
     except Exception as exc:

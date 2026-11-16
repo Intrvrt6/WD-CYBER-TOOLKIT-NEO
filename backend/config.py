@@ -48,7 +48,7 @@ SAMPLES_DIR = BASE_DIR / "samples"
 
 DATABASE_URL = os.environ.get("WD_DATABASE_URL", f"sqlite:///{DATA_DIR / 'wd_cyber.db'}")
 INSTANCE_NAME = os.environ.get("WD_INSTANCE_NAME", "WD CYBER TOOLKIT NEO")
-APP_VERSION = "1.2.0"
+APP_VERSION = "1.2.1"
 
 # --- session / authorization lifetime -------------------------------------
 SESSION_TTL_MINUTES = int(os.environ.get("WD_SESSION_TTL_MINUTES", "480"))

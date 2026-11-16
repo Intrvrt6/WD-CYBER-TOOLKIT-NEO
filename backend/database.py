@@ -209,12 +209,15 @@ def kv_get(db, key: str, default: Any = None) -> Any:
     return default if row is None else row.value
 
 
-def kv_set(db, key: str, value: Any) -> None:
+def kv_set(db, key: str, value: Any, commit: bool = True) -> None:
     """Persist a JSON value.
 
     A deep copy is assigned on every write: SQLAlchemy's plain JSON column does
     not track in-place mutation, so re-assigning the same dict object (the
     common "read, update, write back" pattern) would silently not persist.
+
+    ``commit=False`` stages the change so a caller can commit it atomically with
+    other writes (the audit chain appends its anchor that way).
     """
     import copy
     fresh = copy.deepcopy(value)
@@ -224,4 +227,5 @@ def kv_set(db, key: str, value: Any) -> None:
     else:
         row.value = fresh
         row.updated_at = utcnow()
-    db.commit()
+    if commit:
+        db.commit()

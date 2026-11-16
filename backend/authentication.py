@@ -274,7 +274,25 @@ def revoke_all(db, reason: str = "emergency_stop") -> int:
 
 
 # ---------------------------------------------------------------- passwords --
-def change_password(db, user: User, old: str, new: str) -> dict[str, Any]:
+def _revoke_other_sessions(db, user: User, keep_id: str | None) -> int:
+    """Revoke every other live session of this operator.
+
+    Rotating a password or PIN is the recovery action for a leaked credential, so
+    it must not leave the thief's bearer token valid. The caller's own session is
+    kept so the console does not log itself out mid-flow.
+    """
+    rows = db.execute(select(Session).where(Session.user_id == user.id,
+                                            Session.revoked.is_(False))).scalars().all()
+    n = 0
+    for s in rows:
+        if keep_id is not None and s.id == keep_id:
+            continue
+        s.revoked = True
+        n += 1
+    return n
+
+
+def change_password(db, user: User, old: str, new: str, keep_session_id: str | None = None) -> dict[str, Any]:
     if not security.verify_secret(user.password_hash, old):
         raise AuthError("Current password incorrect.", "BAD_PASSWORD", 401)
     problem = security.password_strength_problem(new)
@@ -282,17 +300,22 @@ def change_password(db, user: User, old: str, new: str) -> dict[str, Any]:
         raise AuthError(problem, "WEAK_PASSWORD", 400)
     user.password_hash = security.hash_secret(new)
     user.must_change_password = False
+    revoked = _revoke_other_sessions(db, user, keep_session_id)
     db.commit()
-    audit.record("auth.password.changed", actor=user.username, target=user.username, db=db)
-    return {"ok": True}
+    audit.record("auth.password.changed", actor=user.username, target=user.username,
+                 detail={"sessions_revoked": revoked}, db=db)
+    return {"ok": True, "sessions_revoked": revoked}
 
 
-def change_pin(db, user: User, password: str, new_pin: str) -> dict[str, Any]:
+def change_pin(db, user: User, password: str, new_pin: str,
+               keep_session_id: str | None = None) -> dict[str, Any]:
     if not security.verify_secret(user.password_hash, password):
         raise AuthError("Password required to rotate PIN.", "BAD_PASSWORD", 401)
     if not new_pin.isdigit() or len(new_pin) < 6:
         raise AuthError("PIN must be at least 6 digits.", "WEAK_PIN", 400)
     user.pin_hash = security.hash_secret(new_pin)
+    revoked = _revoke_other_sessions(db, user, keep_session_id)
     db.commit()
-    audit.record("auth.pin.changed", actor=user.username, target=user.username, db=db)
-    return {"ok": True}
+    audit.record("auth.pin.changed", actor=user.username, target=user.username,
+                 detail={"sessions_revoked": revoked}, db=db)
+    return {"ok": True, "sessions_revoked": revoked}

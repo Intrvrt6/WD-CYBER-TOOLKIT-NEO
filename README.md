@@ -94,7 +94,7 @@ export WD_SHORTCUT=WD-XXXXXXXXXXXXX
 ./scripts/run.sh
 ```
 
-Run the test suite (142 tests: hashing, auth, lockout, per-identity rate limiting, stage-2 PIN
+Run the test suite (151 tests: hashing, auth, lockout, per-identity rate limiting, stage-2 PIN
 ceiling, scope, authorization ownership, static-file containment, audit chain + concurrency,
 emergency stop, engine contract, full API flow):
 
@@ -273,7 +273,7 @@ WD-CYBER-TOOLKIT-NEO/
 ├── database/                 SQLite DB + one-time bootstrap credentials
 ├── evidence/                 per-assessment evidence artifacts
 ├── reports/                  generated reports + run logs
-├── tests/                    pytest suite (142 tests)
+├── tests/                    pytest suite (151 tests)
 ├── scripts/                  install.sh, run.sh, test.sh
 ├── docs/                     ARCHITECTURE.md, OPERATOR_MANUAL.md, API.md, SECURITY.md
 ├── requirements.txt

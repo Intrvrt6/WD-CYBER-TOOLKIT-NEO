@@ -61,6 +61,45 @@ def add_scope(db, target: str, target_type: str = "auto", description: str = "",
     return entry
 
 
+def _url_origin(value: str) -> tuple[str, str, int] | None:
+    """(scheme, host, port) for an absolute URL, or None when unparseable.
+
+    ``urlparse(...).hostname`` also resolves userinfo and default ports, which is
+    what matters: ``https://example.com@evil.tld/`` has host ``evil.tld`` even
+    though the string *starts with* ``https://example.com``.
+    """
+    from urllib.parse import urlsplit
+    try:
+        parts = urlsplit(value.strip())
+    except ValueError:
+        return None
+    if not parts.scheme or not parts.hostname:
+        return None
+    try:
+        port = parts.port or (443 if parts.scheme == "https" else 80)
+    except ValueError:
+        return None
+    return (parts.scheme.lower(), parts.hostname.lower(), port)
+
+
+def _cidr_contains(entry_target: str, target: str) -> bool:
+    """True only when `target` is a network/host fully inside `entry_target`.
+
+    Comparing the first address of the requested range (the previous behaviour)
+    let a registered /24 cover a requested /8: 16.7M addresses out of scope but
+    validated in scope. A requested range must be a subnet of the entry.
+    """
+    try:
+        net = ipaddress.ip_network(entry_target, strict=False)
+        req = ipaddress.ip_network(target.split("/")[0] if "/" not in target else target,
+                                  strict=False)
+    except ValueError:
+        return False
+    if "/" in target:
+        return req.subnet_of(net)
+    return req.network_address in net
+
+
 def _matches(entry: ScopeEntry, target: str) -> bool:
     e = entry.target.strip()
     t = target.strip()
@@ -68,20 +107,39 @@ def _matches(entry: ScopeEntry, target: str) -> bool:
         return True
     et = entry.target_type
     if et in ("cidr", "ip"):
-        try:
-            host = t.split("/")[0]
-            net = ipaddress.ip_network(e, strict=False)
-            return ipaddress.ip_address(host) in net
-        except ValueError:
-            return False
+        return _cidr_contains(e, t)
     if et == "domain":
         tl = t.lower()
         if tl.startswith(("http://", "https://")):
-            tl = tl.split("//", 1)[1].split("/", 1)[0].split(":", 1)[0]
+            origin = _url_origin(t)
+            tl = origin[1] if origin else ""
+        else:
+            tl = tl.split("/", 1)[0].split(":", 1)[0]
         el = e.lower()
-        return tl == el or tl.endswith("." + el)
+        return bool(tl) and (tl == el or tl.endswith("." + el))
     if et == "url":
-        return t.startswith(e)
+        # Origin comparison, then a *path* prefix on that origin. A raw string
+        # prefix accepted `https://example.com@evil.tld/` and
+        # `https://example.com.evil.tld/` while the grant recorded only
+        # `https://example.com`; and a bare origin comparison would have widened
+        # `https://host/api` to the whole host.
+        want, got = _url_origin(e), _url_origin(t)
+        if want and got:
+            same_origin = (want[0] == got[0] and want[2] == got[2]
+                           and (got[1] == want[1] or got[1].endswith("." + want[1])))
+            if not same_origin:
+                return False
+            from urllib.parse import urlsplit
+            want_path = urlsplit(e).path or "/"
+            got_path = urlsplit(t).path or "/"
+            if want_path in ("", "/"):
+                return True
+            return got_path == want_path or got_path.startswith(want_path.rstrip("/") + "/")
+        # A path-prefixed entry with no scheme keeps path semantics, but must not
+        # be widened by a different host.
+        if "/" in e and not want:
+            return t.startswith(e)
+        return False
     if et == "can":
         return t == e or t.startswith(e)
     if et == "ics_endpoint":

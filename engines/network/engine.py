@@ -460,7 +460,7 @@ def tls_probe(host: str, port: int) -> dict:
         out.update({"connected": True, "verified": False, "hostname_mismatch": "hostname" in str(exc).lower(),
                     "verify_error": str(exc)[:300]})
         try:
-            insecure = ssl._create_unverified_context()  # evidence gathering only
+            insecure = _unverified_context()  # evidence gathering only
             with socket.create_connection((host, port), timeout=6) as sock:
                 with insecure.wrap_socket(sock, server_hostname=host) as s2:
                     out["version"] = s2.version()
@@ -472,13 +472,46 @@ def tls_probe(host: str, port: int) -> dict:
     return out
 
 
+def _safe_xml_parse(path: str):
+    """Parse XML defensively.
+
+    The assessment may be pointed at an nmap XML file supplied by the operator, so
+    the document is untrusted input. defusedxml blocks entity expansion
+    (billion-laughs / XXE) when present; the stdlib parser is the fallback with
+    entity resolution disabled.
+    """
+    try:
+        from defusedxml import ElementTree as SafeET  # type: ignore
+        return SafeET.parse(path).getroot()
+    except ImportError:
+        import xml.etree.ElementTree as ET
+        parser = ET.XMLParser()
+        parser.parser.DefaultHandler = lambda x: None
+        parser.parser.EntityDeclHandler = lambda *a: None
+        return ET.parse(path, parser=parser).getroot()
+
+
+def _unverified_context() -> ssl.SSLContext:
+    """TLS context that deliberately does not validate (assessment evidence only).
+
+    A TLS posture check must connect to expired or mismatched certificates in
+    order to report on them. Built through the public API so it does not depend on
+    the private `ssl._create_unverified_context`.
+    """
+    ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+    return ctx
+
+
 def parse_nmap_xml(path: str) -> list[dict]:
     if not os.path.exists(path):
         return []
-    import xml.etree.ElementTree as ET
     try:
-        root = ET.parse(path).getroot()
-    except ET.ParseError:
+        root = _safe_xml_parse(path)
+    except Exception:
+        return []
+    if root is None:
         return []
     services = []
     for host in root.findall("host"):

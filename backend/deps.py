@@ -69,6 +69,21 @@ def require_stage2_fresh_password(p: Principal = Depends(require_stage2)) -> Pri
     return p
 
 
+def require_stage2_role(*roles: str):
+    """Role check *and* the stage-2 / rotated-password gates.
+
+    `require_role` only looks at the user row, so a stage-1 viewer could reach any
+    route that used it for RBAC alone; the execution routes need both.
+    """
+    def _dep(p: Principal = Depends(require_stage2_fresh_password)) -> Principal:
+        if p.role not in roles:
+            raise HTTPException(status_code=403, detail={
+                "code": "ROLE_REQUIRED",
+                "message": f"Requires role: {', '.join(roles)}"})
+        return p
+    return _dep
+
+
 def require_role(*roles: str):
     def _dep(p: Principal = Depends(current_principal)) -> Principal:
         if p.role not in roles:
