@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: test (python ${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+
+      - name: Install system tooling used by the engines
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            nmap tcpdump dnsutils whois curl openssl yara jq can-utils
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Byte-compile every module
+        run: python -m compileall -q backend engines tests
+
+      - name: Verify all ten engines register with unique check ids
+        run: |
+          python - <<'PY'
+          import engines
+          from engines import base
+          mods = base.modules()
+          assert len(mods) == 10, f"expected 10 engines, got {len(mods)}: {mods}"
+          assert not engines.LOAD_ERRORS, engines.LOAD_ERRORS
+          total = 0
+          for name in mods:
+              ids = [c[0] for c in base.get_engine(name).checks]
+              assert ids, f"{name} declares no checks"
+              assert len(ids) == len(set(ids)), f"{name} has duplicate check ids"
+              total += len(ids)
+          print(f"{len(mods)} engines registered, {total} checks declared")
+          PY
+
+      - name: Run the test suite
+        run: python -m pytest tests/ -q
+
+      - name: Smoke-test the API surface
+        run: |
+          python - <<'PY'
+          from fastapi.testclient import TestClient
+          from backend.main import app
+          with TestClient(app) as c:
+              assert c.get("/api/health").status_code == 200
+              assert c.get("/api/capabilities").status_code == 200
+              assert c.get("/api/scope").status_code == 401          # auth enforced
+              spec = c.get("/api/openapi.json").json()
+              print(f"{len(spec['paths'])} API paths published")
+              assert any("report" in p for p in spec["paths"])
+              assert any("emergency-stop" in p for p in spec["paths"])
+          PY
