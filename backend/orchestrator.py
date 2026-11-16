@@ -1,11 +1,9 @@
 """Assessment engine: preflight -> authorized execution -> evidence -> findings -> risk."""
 from __future__ import annotations
 
-import datetime as dt
 import os
 import threading
 import time
-import uuid
 from typing import Any
 
 from sqlalchemy import select
@@ -14,7 +12,6 @@ from backend import audit, authorization, config, emergency_stop, runner, templa
 from backend.database import (
     Artifact, Assessment, Finding, Job, SessionLocal, User, utcnow,
 )
-import engines  # noqa: F401  (registers engines via engines/__init__.py)
 from engines.base import Context, Result, get_engine, module_catalog
 
 SEVERITY_ORDER = {"critical": 4, "high": 3, "medium": 2, "low": 1, "info": 0}
@@ -22,6 +19,8 @@ SEVERITY_SCORE = {"critical": 9.5, "high": 8.0, "medium": 5.5, "low": 2.5, "info
 
 _JOBS: dict[str, dict[str, Any]] = {}
 _LOCK = threading.Lock()
+_MAX_LOG_LINES = 500
+_MAX_LIVE_MESSAGES = 200
 
 
 # --------------------------------------------------------------- preflight --
@@ -107,15 +106,28 @@ def start_job(db, assessment: Assessment, authz_id: str, actor: str) -> dict[str
 
 
 def _log(db, job: Job, level: str, message: str) -> None:
+    """Append a structured log line (bounded) and mirror it to the live buffer."""
     log = list(job.log or [])
     log.append({"at": utcnow().isoformat(), "level": level, "message": message[:2000]})
-    job.log = log[-500:]
+    job.log = log[-_MAX_LOG_LINES:]
     db.commit()
     with _LOCK:
         entry = _JOBS.get(job.id)
         if entry is not None:
-            entry.setdefault("messages", []).append(log[-1])
+            buf = entry.setdefault("messages", [])
+            buf.append(log[-1])
+            if len(buf) > _MAX_LIVE_MESSAGES:
+                del buf[:-_MAX_LIVE_MESSAGES]
 
+
+def _drop_job(job_id: str) -> None:
+    """Release the in-memory job entry once it has finished.
+
+    Without this the registry kept a Thread object and its message buffer for
+    every job ever run, which grows without bound in a long-lived process.
+    """
+    with _LOCK:
+        _JOBS.pop(job_id, None)
 
 
 def _run_job(job_id: str, assessment_id: str) -> None:
@@ -207,6 +219,7 @@ def _run_job(job_id: str, assessment_id: str) -> None:
             pass
     finally:
         db.close()
+        _drop_job(job_id)
 
 
 def _set_progress(db, job: Job, pct: int) -> None:

@@ -5,7 +5,7 @@ import pytest
 
 from backend import authentication, authorization
 from backend.authorization import ScopeError
-from backend.database import Authorization, User
+from backend.database import User
 
 
 def test_classify_target():

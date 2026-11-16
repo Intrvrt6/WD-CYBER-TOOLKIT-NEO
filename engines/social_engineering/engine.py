@@ -21,8 +21,7 @@ import string
 from typing import Any
 
 from backend import runner
-from engines import base
-from engines.base import Context, Result, artifact, have, unavailable
+from engines.base import Context, Result, have, unavailable
 
 DKIM_SELECTORS = ["default", "google", "selector1", "selector2", "mail", "k1", "s1", "dkim"]
 LOOKALIKE_TLDS = ["net", "org", "info", "co", "biz", "online"]

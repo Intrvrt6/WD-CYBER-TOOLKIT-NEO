@@ -1,7 +1,6 @@
 """API-level integration tests through FastAPI TestClient (real HTTP contract)."""
 import json
 
-import pytest
 
 
 def _login(client, creds):

@@ -1,11 +1,10 @@
 """FastAPI dependencies: session resolution, stage enforcement, RBAC."""
 from __future__ import annotations
 
-from fastapi import Depends, Header, HTTPException, Request
+from fastapi import Depends, Header, HTTPException
 from sqlalchemy.orm import Session as OrmSession
 
 from backend import authentication
-from backend.authentication import AuthError
 from backend.database import Session, User, get_db
 
 

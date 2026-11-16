@@ -22,7 +22,7 @@ from reportlab.platypus import (KeepTogether, PageBreak, Paragraph, SimpleDocTem
 from sqlalchemy import select
 
 from backend import config
-from backend.database import Artifact, Assessment, Finding, User
+from backend.database import Artifact, Assessment, Finding
 
 I18N: dict[str, dict[str, str]] = {
     "en": {

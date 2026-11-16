@@ -8,18 +8,13 @@ active action is recorded with its exact command and a rollback note.
 """
 from __future__ import annotations
 
-import ipaddress
 import json
 import os
 import re
 import socket
 import ssl
-import subprocess
-import threading
-import time
-from typing import Any
 
-from backend import config, runner
+from backend import runner
 from engines.base import Context, Result, have, unavailable
 from engines.network.engine import base_target, default_interface, parse_host_port, tls_probe
 

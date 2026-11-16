@@ -55,6 +55,7 @@ plus a template; no other change is required.
 ### Platform core
 
 - **Two-stage WD access control** — Stage 1: WD shortcut code + operator password. Stage 2: separate PIN.
+  A generated bootstrap password must be rotated before authorizing or executing (428 until then).
   Only stage-2 sessions may authorize or execute tests.
 - **Argon2id** for passwords, PINs and shortcut codes; session tokens stored as SHA-256 fingerprints.
 - **Scope registry** with automatic target classification (IP / CIDR / domain / URL / CAN / ICS endpoint),
@@ -90,7 +91,7 @@ export WD_SHORTCUT=WD-XXXXXXXXXXXXX
 ./scripts/run.sh
 ```
 
-Run the test suite (101 tests: hashing, auth, lockout, scope, authorization gates, audit chain,
+Run the test suite (115 tests: hashing, auth, lockout, scope, authorization gates, audit chain,
 emergency stop, engine contract, full API flow):
 
 ```bash
@@ -268,7 +269,7 @@ WD-CYBER-TOOLKIT-NEO/
 ├── database/                 SQLite DB + one-time bootstrap credentials
 ├── evidence/                 per-assessment evidence artifacts
 ├── reports/                  generated reports + run logs
-├── tests/                    pytest suite (101 tests)
+├── tests/                    pytest suite (115 tests)
 ├── scripts/                  install.sh, run.sh, test.sh
 ├── docs/                     ARCHITECTURE.md, OPERATOR_MANUAL.md, API.md, SECURITY.md
 ├── requirements.txt

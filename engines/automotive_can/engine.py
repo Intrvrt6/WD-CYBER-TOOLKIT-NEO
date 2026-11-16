@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import json
 import math
-import os
 import re
 import statistics
 import threading
@@ -25,8 +24,7 @@ import time
 from typing import Any
 
 from backend import runner
-from engines import base
-from engines.base import Context, Result, artifact, have, unavailable
+from engines.base import Context, Result, unavailable
 
 try:  # python-can is a hard requirement for this module, but import must not kill the platform
     import can

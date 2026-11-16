@@ -29,8 +29,7 @@ import socket
 import time
 from typing import Any
 
-from backend import config, runner
-from engines import base
+from backend import runner
 from engines.base import Context, Result, artifact, have, unavailable
 
 # ------------------------------------------------------------------- shapes --
@@ -539,10 +538,10 @@ class ThreatIntelEngine:
     # ------------------------------------------------------------ IOC-06 -----
     def process_triage(self, ctx: Context) -> None:
         try:
-            import psutil  # noqa: F401
+            import psutil as _psutil_probe  # availability probe
         except Exception as exc:
             ctx.add(unavailable("IOC-06", "Suspicious process identification",
-                                f"psutil is not importable: {type(exc).__name__}: {exc}"))
+                                f"psutil is not importable ({type(exc).__name__}: {exc}); got {_psutil_probe.__name__!r}"))
             return
         report = process_triage()
         art = ctx.save_text("process_triage.json", json.dumps(report, indent=2))

@@ -16,11 +16,9 @@ import random
 import re
 import string
 import time
-from typing import Any
 from urllib.parse import urlparse
 
 from backend import runner
-from engines import base
 from engines.base import Context, Result, artifact, have, unavailable
 from engines.network.engine import parse_host_port, tls_probe
 

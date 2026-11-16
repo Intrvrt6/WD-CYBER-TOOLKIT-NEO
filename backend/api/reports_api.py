@@ -5,11 +5,10 @@ import os
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse, Response
-from sqlalchemy import select
 from sqlalchemy.orm import Session as OrmSession
 
 from backend import audit, config
-from backend.database import Artifact, Assessment, Finding, get_db
+from backend.database import Artifact, Assessment, get_db
 from backend.deps import Principal, current_principal
 from backend.reports import generator
 

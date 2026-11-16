@@ -37,8 +37,11 @@ No plaintext password, PIN or shortcut is ever stored. `security.hash_secret` re
 - PIN: minimum 6 digits.
 - Bootstrap passwords are generated with `secrets` (not `random`) and are ~97 bits of entropy
   (`XXXXX-XXXXX-XXXXX-XXXXX!7`); PINs are 8 digits; shortcuts are `WD-` + 13 alphanumerics (~67 bits).
-- `must_change_password` is set when the password was auto-generated, so a fresh install forces a
-  first-login rotation (disable with `WD_FORCE_PASSWORD_CHANGE=0`).
+- `must_change_password` is set when the password was auto-generated. While it is set, the
+  authorization and execution routes answer **`428 PASSWORD_CHANGE_REQUIRED`** (dependency
+  `require_stage2_fresh_password`), so a printed one-time password cannot be used for real work.
+  Rotate it from the console's **Account** view or `POST /api/auth/password`; the flag is cleared
+  on success. Disable the whole behaviour with `WD_FORCE_PASSWORD_CHANGE=0`.
 
 ## 4. Brute-force resistance
 

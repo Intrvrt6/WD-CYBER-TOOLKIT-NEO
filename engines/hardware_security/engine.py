@@ -20,14 +20,12 @@ import os
 import platform
 import re
 import socket
-import struct
 from typing import Any
 
 import psutil
 
 from backend import runner
-from engines import base
-from engines.base import Context, Result, artifact, have, unavailable
+from engines.base import Context, Result, have
 
 SYS = "/sys"
 FW_CANDIDATES = [

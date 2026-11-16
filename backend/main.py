@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from backend import (audit, authentication, authorization, config, database,
+from backend import (authentication, authorization, config, database,
                      emergency_stop, runner)
 from backend.api import auth as auth_api
 from backend.api import artax_api, core_api, integrations_api, reports_api

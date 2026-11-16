@@ -1,7 +1,7 @@
 /* WD CYBER TOOLKIT NEO — application controller. */
 (() => {
   const { $, $$, esc, toast, table, kv, bars, findingCard, stopBadge, badge } = UI;
-  const S = { templates: [], modules: [], runs: [], caps: null, currentJob: null, pollTimer: null, lastAssessment: null };
+  const S = { templates: [], modules: [], runs: [], caps: null, currentJob: null, pollTimer: null, lastAssessment: null, me: null };
 
   /* --------------------------------------------------------------- gate -- */
   function gateMsg(id, text, ok) {
@@ -618,7 +618,6 @@
 
   async function refreshMe() {
     S.me = await WD.me();
-    $('.badge').classList.remove('hidden');
     return S.me;
   }
 

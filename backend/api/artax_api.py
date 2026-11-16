@@ -52,7 +52,6 @@ def ping(p: Principal = Depends(current_principal)):
 def _context_for(db: OrmSession, assessment_id: str | None, scope: str) -> tuple[str, str]:
     """Build the evidence block. Returns (context, resolved_scope)."""
     if scope == "platform":
-        from backend import templates_registry
         from engines import base
         health_like = {"instance": "WD CYBER TOOLKIT NEO", "version": __import__(
             "backend.config", fromlist=["APP_VERSION"]).APP_VERSION,

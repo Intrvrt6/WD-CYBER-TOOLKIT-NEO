@@ -7,7 +7,6 @@ platform still starts and reports that module as unavailable with the reason.
 from __future__ import annotations
 
 import importlib
-import traceback
 
 from engines import base
 

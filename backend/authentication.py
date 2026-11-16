@@ -8,13 +8,12 @@ from __future__ import annotations
 
 import datetime as dt
 import os
-from pathlib import Path
 from typing import Any
 
 from sqlalchemy import select
 
-from backend import audit, config, database, security
-from backend.database import Authorization, Session, Shortcut, User, kv_get, kv_set, utcnow
+from backend import audit, config, security
+from backend.database import Session, Shortcut, User, kv_get, kv_set, utcnow
 
 RATE_KEY = "login_attempts"
 

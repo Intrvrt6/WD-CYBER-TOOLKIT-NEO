@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session as OrmSession
 
 from backend import authentication, emergency_stop
 from backend.authentication import AuthError
-from backend.database import Session, User, get_db
+from backend.database import User, get_db
 from backend.deps import (Principal, bearer, current_principal, require_role,
                           require_stage2)
 

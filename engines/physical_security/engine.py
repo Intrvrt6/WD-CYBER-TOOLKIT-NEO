@@ -24,8 +24,7 @@ import os
 from typing import Any
 
 from backend import runner
-from engines import base
-from engines.base import Context, Result, artifact, unavailable
+from engines.base import Context, Result, unavailable
 
 # ---------------------------------------------------------------------------
 # Default checklist: 20 controls over 5 domains.  Each item states the control,

@@ -11,14 +11,11 @@ Contract:
 from __future__ import annotations
 
 import dataclasses
-import datetime as dt
 import hashlib
-import json
 import os
-import time
-from typing import Any, Callable, Iterable
+from typing import Any, Callable
 
-from backend import config, runner
+from backend import runner
 
 
 @dataclasses.dataclass

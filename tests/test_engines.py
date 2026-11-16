@@ -41,7 +41,6 @@ def test_artifact_hash_matches_known_value(tmp_path):
 
 
 def test_registry_lists_engines():
-    import engines  # noqa: F401
     mods = base.modules()
     assert "network" in mods and "mitm" in mods
     catalog = base.module_catalog()
@@ -80,7 +79,6 @@ def test_ssh_nmap_xml_parser(tmp_path):
 
 
 def test_all_registered_engines_declare_unique_check_ids():
-    import engines  # noqa: F401
     for name in base.modules():
         eng = base.get_engine(name)
         ids = [c[0] for c in eng.checks]

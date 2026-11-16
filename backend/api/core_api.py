@@ -1,7 +1,6 @@
 """Scope, templates, assessments, jobs, findings, capabilities, emergency stop."""
 from __future__ import annotations
 
-import os
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -10,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session as OrmSession
 
 from backend import (audit, authorization, capabilities, emergency_stop, orchestrator,
-                     runner, templates_registry)
+                     templates_registry)
 from backend.database import (Artifact, Assessment, Authorization, Finding, ScopeEntry,
                               get_db)
 from backend.deps import (Principal, current_principal, require_role,

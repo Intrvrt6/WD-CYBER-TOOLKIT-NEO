@@ -1,5 +1,4 @@
 """Artax AI: local analyst, context grounding, endpoint path, API surface."""
-import json
 
 import pytest
 
