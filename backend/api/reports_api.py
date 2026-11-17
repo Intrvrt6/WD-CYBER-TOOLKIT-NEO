@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session as OrmSession
 
 from backend import audit, config
 from backend.database import Artifact, Assessment, get_db
-from backend.deps import Principal, current_principal
+from backend.deps import (Principal, current_principal, ensure_assessment_access, require_stage2_role)
 from backend.reports import generator
 
 router = APIRouter(prefix="/api", tags=["reports"])
@@ -23,6 +23,7 @@ def get_report(assessment_id: str, fmt: str = Query(default="pdf", pattern="^(pd
     a = db.get(Assessment, assessment_id)
     if a is None:
         raise HTTPException(status_code=404, detail="assessment not found")
+    ensure_assessment_access(a, p)
     try:
         content, mime, ext = generator.render(db, assessment_id, fmt, lang)
     except Exception as exc:
@@ -38,10 +39,11 @@ def get_report(assessment_id: str, fmt: str = Query(default="pdf", pattern="^(pd
 @router.post("/assessments/{assessment_id}/report/save")
 def save_report(assessment_id: str, fmt: str = Query(default="pdf", pattern="^(pdf|html|md)$"),
                 lang: str = Query(default="en", pattern="^(en|id)$"),
-                p: Principal = Depends(current_principal), db: OrmSession = Depends(get_db)):
+                p: Principal = Depends(require_stage2_role("admin", "operator")), db: OrmSession = Depends(get_db)):
     a = db.get(Assessment, assessment_id)
     if a is None:
         raise HTTPException(status_code=404, detail="assessment not found")
+    ensure_assessment_access(a, p)
     path = generator.save(db, assessment_id, fmt, lang)
     audit.record("report.saved", actor=p.username, target=assessment_id,
                  detail={"path": path, "format": fmt, "lang": lang}, db=db)
@@ -55,6 +57,10 @@ def download_artifact(assessment_id: str, artifact_id: str,
     art = db.get(Artifact, artifact_id)
     if art is None or art.assessment_id != assessment_id:
         raise HTTPException(status_code=404, detail="artifact not found")
+    assessment = db.get(Assessment, assessment_id)
+    if assessment is None:
+        raise HTTPException(status_code=404, detail="artifact not found")
+    ensure_assessment_access(assessment, p)
     if not os.path.exists(art.path):
         raise HTTPException(status_code=410, detail="artifact file missing on disk")
     audit.record("evidence.downloaded", actor=p.username, target=art.name,

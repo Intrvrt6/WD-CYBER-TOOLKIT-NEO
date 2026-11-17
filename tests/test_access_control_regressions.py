@@ -231,3 +231,124 @@ def test_concurrent_audit_appends_keep_the_chain_valid(client, operator, db):
     dups = db.execute(text(
         "SELECT seq, COUNT(*) c FROM audit_events GROUP BY seq HAVING c > 1")).fetchall()
     assert dups == [], dups
+
+
+
+# -------------------------------------------------- assessment read isolation --
+def test_operator_cannot_read_another_operators_assessment(client, operator, db):
+    owner_token = _login(client, operator)
+    client.post("/api/scope", json={"target": "example.com"}, headers=_h(owner_token))
+    created = client.post(
+        "/api/assessments",
+        json={"template": "physical_pentest", "targets": ["example.com"]},
+        headers=_h(owner_token),
+    )
+    assert created.status_code == 200, created.text
+    assessment_id = created.json()["id"]
+
+    made = client.post(
+        "/api/auth/operators",
+        json={"username": "WD-PRIVATE-READER", "password": "Private-Reader-2026",
+              "pin": "31415926", "role": "operator"},
+        headers=_h(owner_token),
+    )
+    assert made.status_code == 200, made.text
+    db.execute(text(
+        "UPDATE users SET must_change_password=0 WHERE username='WD-PRIVATE-READER'"
+    ))
+    db.commit()
+    reader_token = _login(client, {
+        "username": "WD-PRIVATE-READER", "password": "Private-Reader-2026",
+        "pin": "31415926", "shortcut": operator["shortcut"],
+    })
+    headers = _h(reader_token)
+
+    listed = client.get("/api/assessments", headers=headers).json()["assessments"]
+    assert all(row["id"] != assessment_id for row in listed)
+    assert client.get(f"/api/assessments/{assessment_id}", headers=headers).status_code == 404
+    assert client.get(
+        f"/api/assessments/{assessment_id}/findings", headers=headers
+    ).status_code == 404
+    assert client.get(
+        f"/api/assessments/{assessment_id}/report?fmt=md", headers=headers
+    ).status_code == 404
+    assert client.post(
+        f"/api/assessments/{assessment_id}/report/save?fmt=md", headers=headers
+    ).status_code == 404
+    artax = client.post(
+        "/api/artax/ask",
+        json={"question": "Summarize this assessment", "assessment_id": assessment_id},
+        headers=headers,
+    )
+    assert artax.status_code == 404, artax.text
+
+
+
+# ---------------------------------------------------- stage-1 write isolation --
+def test_stage1_cannot_mutate_scope_or_administer_operators(client, operator):
+    token = _stage1(client, operator)
+    headers = _h(token)
+
+    scope = client.post("/api/scope", json={"target": "restricted.example"}, headers=headers)
+    assert scope.status_code == 403, scope.text
+    assert scope.json()["detail"]["code"] == "STAGE2_REQUIRED"
+
+    create_user = client.post(
+        "/api/auth/operators",
+        json={"username": "WD-NOT-ALLOWED", "password": "Not-Allowed-2026",
+              "pin": "31415926", "role": "operator"},
+        headers=headers,
+    )
+    assert create_user.status_code == 403, create_user.text
+    assert create_user.json()["detail"]["code"] == "STAGE2_REQUIRED"
+
+    shortcut = client.post("/api/auth/shortcuts?label=unauthorized", headers=headers)
+    assert shortcut.status_code == 403, shortcut.text
+    assert shortcut.json()["detail"]["code"] == "STAGE2_REQUIRED"
+
+
+
+# ------------------------------------------------ viewer remains read-only --
+def test_viewer_cannot_save_reports_or_clear_emergency_stop(client, operator, db):
+    admin_token = _login(client, operator)
+    client.post("/api/scope", json={"target": "viewer.example"}, headers=_h(admin_token))
+    assessment = client.post(
+        "/api/assessments",
+        json={"template": "physical_pentest", "targets": ["viewer.example"]},
+        headers=_h(admin_token),
+    )
+    assert assessment.status_code == 200, assessment.text
+
+    created = client.post(
+        "/api/auth/operators",
+        json={"username": "WD-READ-ONLY", "password": "Read-Only-Viewer-2026",
+              "pin": "27182818", "role": "viewer"},
+        headers=_h(admin_token),
+    )
+    assert created.status_code == 200, created.text
+    db.execute(text("UPDATE users SET must_change_password=0 WHERE username='WD-READ-ONLY'"))
+    db.commit()
+    viewer = {
+        "username": "WD-READ-ONLY", "password": "Read-Only-Viewer-2026",
+        "pin": "27182818", "shortcut": operator["shortcut"],
+    }
+    viewer_token = _login(client, viewer)
+    headers = _h(viewer_token)
+
+    saved = client.post(
+        f"/api/assessments/{assessment.json()['id']}/report/save?fmt=md",
+        headers=headers,
+    )
+    assert saved.status_code == 403, saved.text
+    assert saved.json()["detail"]["code"] == "ROLE_REQUIRED"
+
+    client.post("/api/emergency-stop", json={"reason": "viewer-readonly-test"},
+                headers=_h(admin_token))
+    viewer_token = _login(client, viewer)  # stop revokes all existing sessions
+    headers = _h(viewer_token)
+    clear = client.post("/api/emergency-stop/clear", headers=headers)
+    assert clear.status_code == 403, clear.text
+    assert clear.json()["detail"]["code"] == "ROLE_REQUIRED"
+    unlock = client.post("/api/auth/unlock", headers=headers)
+    assert unlock.status_code == 403, unlock.text
+    assert unlock.json()["detail"]["code"] == "ROLE_REQUIRED"

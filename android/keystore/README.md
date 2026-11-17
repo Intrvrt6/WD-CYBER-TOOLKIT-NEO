@@ -1,55 +1,51 @@
-# Release signing key
+# Android release signing key — operator-managed
 
-`wd-neo.jks` is the **committed** release signing key for the Android client.
+**No private signing key belongs in this repository.** The previously committed
+`wd-neo.jks` and its documented passphrase are considered compromised and have
+been removed from the current source tree. Removing the file in a new commit does
+not erase it from earlier Git history or existing clones.
 
-```
-alias        wdneo
-storepass    wdneo-release
-keypass      wdneo-release
-DN           CN=WD Cyber Toolkit NEO, OU=Security Engineering, O=WD, L=Jakarta, C=ID
-cert SHA-256  73119799ee36960bfbf1f5af64a574a90d0fcfdd3441acd492a9f5e62bb8936b
-```
+## Required incident actions
 
-## Why it is committed (and why that is correct)
+1. Generate a new release keystore under the publisher's control and store an
+   encrypted backup offline or in an approved secret manager.
+2. Do not reuse the old committed certificate or passphrase.
+3. Purge the old keystore blob from repository history using a coordinated
+   history rewrite, then force-update the affected branches and ask collaborators
+   to re-clone. This is not performed automatically by this source change because
+   rewriting shared Git history is disruptive.
+4. If the old-signed APK has already been distributed, plan a migration: Android
+   will reject an APK signed with the new certificate as an in-place update.
+   Users may need to uninstall the old build and install the new one, unless an
+   applicable managed app-signing/rotation mechanism is already configured.
+5. Treat any APK built with the old key as untrusted for future release signing.
 
-Android identifies an app by its signing certificate. If the key changes, an
-update is rejected:
+## Create a private signing key
 
-```
-adb install -r wd-neo.apk
-Failure [INSTALL_FAILED_UPDATE_INCOMPATIBLE: ... signatures do not match]
-```
-
-Because `build_apk.sh` generated a **new random key whenever `keystore/` was
-missing**, and `keystore/` was gitignored, every fresh clone produced a different
-certificate. That was measured, not assumed — two builds from an identical tree
-gave two different certificate digests:
-
-```
-build 1  cert SHA-256 = 4ed1063ddd67cdb9a8ac53688646a9f32b2a6c885cefe13383eeed3cc8f541ca
-build 2  cert SHA-256 = 73119799ee36960bfbf1f5af64a574a90d0fcfdd3441acd492a9f5e62bb8936b
-```
-
-With the key committed, consecutive builds now share one identity:
-
-```
-build 1  cert SHA-256 = 73119799ee36960bfbf1f5af64a574a90d0fcfdd3441acd492a9f5e62bb8936b
-build 2  cert SHA-256 = 73119799ee36960bfbf1f5af64a574a90d0fcfdd3441acd492a9f5e62bb8936b
-```
-
-## Treating it as a secret
-
-This is a **release keystore with a documented passphrase**, so it is not
-confidential. It is still the app identity: anyone with it can sign an update your
-install will accept. For a public distribution, generate your own key and keep it
-out of the repository:
+Run from the repository root (or use the build script's automatic local key
+creation) and never commit the resulting file:
 
 ```bash
-keytool -genkeypair -keystore android/keystore/wd-neo.jks -alias wdneo \
-  -keyalg RSA -keysize 2048 -validity 10950 \
-  -storepass "$STORE_PASS" -keypass "$KEY_PASS" \
-  -dname 'CN=Your Org, O=Your Org, C=ID'
+mkdir -p android/keystore
+keytool -genkeypair \
+  -keystore android/keystore/wd-neo.jks \
+  -alias wdneo -keyalg RSA -keysize 3072 -validity 10950 \
+  -dname 'CN=WD Cyber Toolkit NEO, OU=Security Engineering, O=WD, L=Jakarta, C=ID'
+chmod 600 android/keystore/wd-neo.jks
 ```
 
-then point the build at it with `WD_KEYSTORE` / `WD_STOREPASS` / `WD_KEYPASS`
-(see `build_apk.sh`).
+Supply passwords through a secret manager or protected environment variables:
+
+```bash
+cd android
+export WD_KEYSTORE=keystore/wd-neo.jks
+export WD_KEYALIAS=wdneo
+export WD_STOREPASS='(retrieve from your secret manager)'
+export WD_KEYPASS='(retrieve from your secret manager)'
+./build_apk.sh --clean
+```
+
+The build script refuses to sign if `WD_STOREPASS` or `WD_KEYPASS` is missing.
+It creates a local key only when the configured keystore path does not exist.
+The keystore file is ignored by Git. Keep a secure offline backup; losing the
+private key prevents signing compatible updates.

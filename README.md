@@ -79,11 +79,12 @@ plus a template; no other change is required.
 cd WD-CYBER-TOOLKIT-NEO
 ./scripts/install.sh        # venv + pip deps + capability report
 ./android/                  native client: build_apk.sh, prepare_sdk.sh, src/, harness/
-./scripts/run.sh            # http://0.0.0.0:8000  (API docs at /api/docs)
+./scripts/run.sh            # http://127.0.0.1:8000 by default (API docs at /api/docs)
 ```
 
 On first boot the platform generates a strong operator password, stage-2 PIN and WD shortcut,
-prints them once to the console and writes them to `database/bootstrap_credentials.txt` (mode `0600`).
+then writes them once to `database/bootstrap_credentials.txt` with mode `0600`. The secrets are
+not printed to application logs; retrieve the file through a trusted local channel and delete it after provisioning.
 
 To provision explicitly instead, set environment variables **before** first boot:
 
@@ -114,12 +115,10 @@ cd WD-CYBER-TOOLKIT-NEO
 bash scripts/termux.sh          # installs packages + deps, inits DB, starts server
 ```
 
-It prints the addresses that actually work:
-
-```
- this device : http://127.0.0.1:8000   <-- open in the phone's browser
- LAN        : http://192.168.1.42:8000  <-- other devices on the same Wi-Fi
-```
+By default the console binds to loopback only and is reachable from the phone itself at
+`http://127.0.0.1:8000`. LAN access is deliberately disabled. To opt in on a trusted network,
+start it with `WD_HOST=0.0.0.0 bash scripts/termux.sh`; use TLS through a trusted reverse proxy
+before sending credentials or bearer tokens across a network.
 
 `scripts/termux.sh` handles what the generic installer cannot: `pkg` instead of
 `apt`, `clang` for native extensions, no venv, a **core-only** requirement set

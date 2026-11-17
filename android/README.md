@@ -4,37 +4,39 @@ Native Android client for WD CYBER TOOLKIT NEO. It is a real, signed, installabl
 APK built directly with the Android SDK build tools (no Gradle, no network at build
 time) and it drives the same authenticated REST API as the web UI.
 
-```
-android/dist/wd-neo.apk          58,719 bytes   signed (v2 + v3), minSdk 24, targetSdk 34
-package                          sh.testssl.wdneo
-version                          1.0.0 (versionCode 1)
-```
+**Release artifact notice:** the previously committed APK was signed with the
+repository's exposed signing key and has been removed from the current source
+tree. Do not install or redistribute that old APK. Build a fresh APK using a
+publisher-controlled private keystore as described below. The package remains
+`sh.testssl.wdneo`; minSdk 24 and targetSdk 34.
 
 ---
 
-## Install
+## Connect safely
 
-```bash
-adb install -r android/dist/wd-neo.apk
-```
-
-On the device, open **WD NEO**, then enter the backend base URL (for example
-`http://192.168.1.10:8000`), the operator username/password, the stage-1 WD
-shortcut and the stage-2 PIN. The app normalises the URL (adds a scheme, trims a
-trailing slash) and stores only what it needs to resume the session.
+On the same phone as a Termux-hosted backend, use `http://127.0.0.1:8000`.
+For a remote server, use an HTTPS URL such as `https://console.example.test`;
+terminate TLS at a trusted reverse proxy. **Do not send bearer tokens over plain
+HTTP on a LAN or the public internet** — they can be intercepted. The Android
+client stores the server address and username; the bearer token remains in memory.
 
 ---
 
 ## Build from source
 
 Preflight requires a JDK, `keytool`, `zip`, and an Android SDK with build-tools +
-a platform `android.jar`. Point the script at them if they are not in the default
-locations:
+a platform `android.jar`. Release signing also requires a private keystore password
+and key password supplied through a secret manager or protected environment. The
+repository no longer contains a shared release key.
 
 ```bash
 cd android
 export ANDROID_BUILD_TOOLS=/path/to/build-tools/34.0.0
 export ANDROID_PLATFORM=/path/to/platforms/android-34
+export WD_KEYSTORE=keystore/wd-neo.jks
+export WD_KEYALIAS=wdneo
+export WD_STOREPASS='(retrieve securely)'
+export WD_KEYPASS='(retrieve securely)'
 ./build_apk.sh --clean      # -> dist/wd-neo.apk
 ```
 
@@ -42,8 +44,9 @@ Default paths used by this repo's build host:
 `/workspace/android-sdk/bt/android-14` and
 `/workspace/android-sdk/plat/android-34-ext12`.
 
-The script runs seven stages and fails loudly rather than emitting a broken APK:
-compile resources (`aapt2`) → link resources + manifest → `javac` → dex (`d8`) →
+The script runs seven stages and fails loudly rather than emitting a broken APK. It creates a local private keystore on first use if none exists; `android/keystore/*.jks` is gitignored. Never commit or share that file.
+
+The build pipeline then compiles resources (`aapt2`) → link resources + manifest → `javac` → dex (`d8`) →
 package → `zipalign` → sign (`apksigner`) → verify.
 
 ---

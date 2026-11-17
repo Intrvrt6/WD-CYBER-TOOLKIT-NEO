@@ -14,7 +14,7 @@ from backend.artax import build_assessment_context, get_client
 from backend.artax.client import ArtaxError
 from backend.artax.prompts import build_platform_context
 from backend.database import Artifact, Assessment, get_db
-from backend.deps import Principal, current_principal
+from backend.deps import (Principal, current_principal, ensure_assessment_access)
 from backend.orchestrator import assessment_dict, findings_for
 
 router = APIRouter(prefix="/api/artax", tags=["artax"])
@@ -49,7 +49,8 @@ def ping(p: Principal = Depends(current_principal)):
                             detail={"code": exc.code, "message": exc.message})
 
 
-def _context_for(db: OrmSession, assessment_id: str | None, scope: str) -> tuple[str, str]:
+def _context_for(db: OrmSession, assessment_id: str | None, scope: str,
+                 principal: Principal) -> tuple[str, str]:
     """Build the evidence block. Returns (context, resolved_scope)."""
     if scope == "platform":
         from engines import base
@@ -64,6 +65,7 @@ def _context_for(db: OrmSession, assessment_id: str | None, scope: str) -> tuple
         a = db.get(Assessment, assessment_id)
         if a is None:
             raise HTTPException(status_code=404, detail="assessment not found")
+        ensure_assessment_access(a, principal)
         arts = db.execute(select(Artifact).where(Artifact.assessment_id == assessment_id)).scalars().all()
         ctx = build_assessment_context(
             assessment_dict(a), findings_for(db, assessment_id),
@@ -72,7 +74,10 @@ def _context_for(db: OrmSession, assessment_id: str | None, scope: str) -> tuple
         return ctx, "assessment"
 
     # scope=auto with no id: fall back to the most recent assessment, else platform.
-    latest = db.execute(select(Assessment).order_by(Assessment.created_at.desc()).limit(1)).scalar_one_or_none()
+    latest_query = select(Assessment).order_by(Assessment.created_at.desc())
+    if principal.role not in {"admin", "viewer"}:
+        latest_query = latest_query.where(Assessment.operator == principal.username)
+    latest = db.execute(latest_query.limit(1)).scalar_one_or_none()
     if latest is not None:
         arts = db.execute(select(Artifact).where(Artifact.assessment_id == latest.id)).scalars().all()
         ctx = build_assessment_context(
@@ -80,12 +85,12 @@ def _context_for(db: OrmSession, assessment_id: str | None, scope: str) -> tuple
             artifacts=[{"name": x.name, "kind": x.kind, "size": x.size, "sha256": x.sha256}
                        for x in arts])
         return ctx, "assessment"
-    return _context_for(db, None, "platform")
+    return _context_for(db, None, "platform", principal)
 
 
 @router.post("/ask")
 def ask(body: AskIn, p: Principal = Depends(current_principal), db: OrmSession = Depends(get_db)):
-    context, resolved = _context_for(db, body.assessment_id, body.scope)
+    context, resolved = _context_for(db, body.assessment_id, body.scope, p)
     client = get_client()
     try:
         result = client.ask(body.question, context, history=body.history[-10:])
@@ -100,7 +105,7 @@ def ask(body: AskIn, p: Principal = Depends(current_principal), db: OrmSession =
 
 @router.post("/stream")
 def stream(body: AskIn, p: Principal = Depends(current_principal), db: OrmSession = Depends(get_db)):
-    context, resolved = _context_for(db, body.assessment_id, body.scope)
+    context, resolved = _context_for(db, body.assessment_id, body.scope, p)
     client = get_client()
 
     def gen():
@@ -142,7 +147,7 @@ def run_preset(preset_id: str, assessment_id: str | None = None,
                p: Principal = Depends(current_principal), db: OrmSession = Depends(get_db)):
     if preset_id not in PRESETS:
         raise HTTPException(status_code=404, detail=f"unknown preset; try: {', '.join(PRESETS)}")
-    context, resolved = _context_for(db, assessment_id, "auto")
+    context, resolved = _context_for(db, assessment_id, "auto", p)
     client = get_client()
     try:
         result = client.ask(PRESETS[preset_id], context)

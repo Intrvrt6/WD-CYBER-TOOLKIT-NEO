@@ -90,3 +90,28 @@ def require_role(*roles: str):
             raise HTTPException(status_code=403, detail=f"Requires role: {', '.join(roles)}")
         return p
     return _dep
+
+
+
+def ensure_assessment_access(assessment, principal: Principal) -> None:
+    """Operators may read their own assessments; admins/viewers may browse all.
+
+    Return 404 for foreign operator-owned records to avoid leaking whether an
+    assessment identifier exists.
+    """
+    if principal.role in {"admin", "viewer"} or assessment.operator == principal.username:
+        return
+    raise HTTPException(status_code=404, detail="assessment not found")
+
+
+def ensure_job_access(db: OrmSession, job_id: str, principal: Principal):
+    from backend.database import Assessment, Job
+
+    job = db.get(Job, job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="job not found")
+    assessment = db.get(Assessment, job.assessment_id)
+    if assessment is None:
+        raise HTTPException(status_code=404, detail="job not found")
+    ensure_assessment_access(assessment, principal)
+    return job

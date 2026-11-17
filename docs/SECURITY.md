@@ -5,7 +5,7 @@
 | Stage | Proof required | Grants |
 |---|---|---|
 | 1 | WD shortcut code **and** operator password | a session that can browse scope, templates, modules, capabilities, audit |
-| 2 | separate PIN | authorizations, assessment creation, execution, report save, stop clear |
+| 2 | separate PIN | scope mutations, operator/shortcut administration, authorizations, assessment creation, execution, report save, stop clear |
 
 Design intent:
 
@@ -100,12 +100,22 @@ stop. They were previously reachable with a stage-1 session and no scope check a
 | `operator` | scope management, authorizations, assessments, reports |
 | `viewer` | read-only browsing: no scope writes, no authorizations, no assessment creation or execution |
 
-RBAC is enforced through `require_stage2_role(...)` on every execute path (authorize, create, run),
+RBAC is enforced through `require_stage2_role(...)` on privileged write paths (scope mutation, operator/shortcut administration, authorize, create, run),
 which checks the role **and** the stage-2 / rotated-password gates; read-only routes use
 `current_principal` or `require_role(...)`. There is no client-side authorization. Halt stays open to
 any authenticated operator by design.
 
-## 8. Emergency stop as a safety control
+## 8. Assessment data isolation
+
+- Operators can list and read only assessments they created, including findings, jobs,
+  reports, evidence artifacts and Artax assessment context. Foreign records return 404
+  to avoid confirming that an identifier exists.
+- Admins and read-only viewers can browse all assessment records. Dashboard aggregates
+  and authorization listings follow the same role boundary.
+- Scope and platform capability data remain shared platform resources.
+
+
+## 9. Emergency stop as a safety control
 
 - Anyone authenticated (even stage 1, even a viewer) can **halt** — stopping must never be blocked
   by an approval workflow.
@@ -115,7 +125,7 @@ any authenticated operator by design.
 - Resuming requires a fresh stage-1 + stage-2 login and an explicit `clear` (stage 2 only).
 - Both transitions are recorded in the audit chain with counts and the acting operator.
 
-## 9. Audit integrity
+## 10. Audit integrity
 
 ```
 hash_n = sha256( hash_{n-1} || canonical_json({seq, ts, actor, action, target, detail}) )
@@ -140,7 +150,7 @@ hash_n = sha256( hash_{n-1} || canonical_json({seq, ts, actor, action, target, d
 Because the chain is computed over every field of every event, altering an actor, action, target,
 timestamp or detail value invalidates that event and every later one.
 
-## 10. Static-file containment
+## 11. Static-file containment
 
 The console is served by a SPA catch-all. The requested path is resolved and must stay inside
 `frontend/` before anything is returned, and only known asset extensions are served as files; every
@@ -148,25 +158,28 @@ other route falls back to `index.html`. Without that containment the catch-all s
 `frontend/../database/bootstrap_credentials.txt` (password, PIN and shortcut in cleartext) to any
 unauthenticated caller.
 
-## 11. Operational hardening checklist
+## 12. Operational hardening checklist
 
-- [ ] Delete `database/bootstrap_credentials.txt` after storing the values.
+- [ ] Retrieve `database/bootstrap_credentials.txt` through a trusted local channel, then delete it; never copy bootstrap secrets into logs or tickets.
 - [ ] Rotate password + PIN after first login.
-- [ ] Serve behind TLS (reverse proxy) — the app itself speaks plain HTTP.
-- [ ] Restrict `WD_HOST` to a management interface where possible; do not expose the API publicly.
+- [ ] Keep the published Docker port bound to loopback by default (`WD_BIND_ADDRESS=127.0.0.1`); change it only for a deliberate network deployment.
+- [ ] Serve remote access behind TLS (reverse proxy) — the app itself speaks plain HTTP.
+- [ ] Configure `WD_CORS_ORIGINS` as a comma-separated HTTPS origin allowlist only when a separate frontend origin is required; same-origin is the default. Wildcards and non-local HTTP origins are rejected.
+- [ ] For PostgreSQL profile, set a strong `POSTGRES_PASSWORD` in the deployment environment; there is no built-in fallback password.
+- [ ] Restrict host/network access with firewall rules; the container listens on its private interface while the host port remains loopback-bound by default.
 - [ ] Keep `evidence/` and `database/` on a backed-up volume; both are inside the audit perimeter.
 - [ ] Export the audit JSON to immutable storage after each engagement.
 - [ ] Review `/api/capabilities` before an engagement and record missing tools as coverage limits.
 
-## 11. Known security limitations (honest list)
+## 13. Known security limitations (honest list)
 
-- **CORS is permissive** (`allow_origins=["*"]`) so the SPA can be served from any host in a lab.
-  Tighten it for internet-facing deployments.
+- **CORS is same-origin by default.** Cross-origin frontends must be explicitly listed in `WD_CORS_ORIGINS`; avoid broad trusted-origin lists.
+- **Browser response headers:** the console sends a restrictive CSP, `nosniff`, frame denial, a no-referrer policy and a permissions policy. Keep third-party scripts out of the trusted frontend origin.
 - **Tokens travel in the `Authorization` header only** — no cookies, so CSRF is not applicable, but
   the client must hold the token (it uses `localStorage`).
-- **One shared rate-limit window** rather than a per-username bucket (see above).
+- **Rate-limit state is database-backed**, but deployments with multiple application processes should validate cross-process concurrency and consider a dedicated shared rate-limit backend.
 - **No MFA/TOTP** beyond the two-stage shared-secret model.
-- **Subprocess execution is by design** — the platform is a pentest driver; run it on a host you
-  control, not on a shared multi-tenant box without OS-level isolation.
+- **Subprocess execution is by design.** Captured stdout/stderr are now bounded in memory and process-group termination escalates to SIGKILL; the platform still requires OS-level isolation on shared hosts.
+- **Android release signing:** the previously committed keystore and its documented passphrase are compromised. A new publisher-controlled key is required; the old key must be purged from Git history in a coordinated history rewrite. See `android/keystore/README.md`.
 - Engines execute read-only operations by default; any write/transmit path requires an explicit
   parameter (`allow_plc_write`, `allow_active`, `execute_arp_spoof`, `replay_allowed`).

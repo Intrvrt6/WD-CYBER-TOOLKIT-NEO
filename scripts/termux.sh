@@ -163,6 +163,7 @@ say "  checks passed : $OK"
 [ "$FAIL" -gt 0 ] && say "  failures      : $FAIL"
 
 PORT="${WD_PORT:-8000}"
+HOST="${WD_HOST:-127.0.0.1}"
 if python3 -c "
 import sys
 sys.path.insert(0, '.')
@@ -176,8 +177,12 @@ fi
 
 say ""
 say "  Open on this phone : $FIRST_URL"
-LANIP="$(python3 -c "import sys;sys.path.insert(0,'.');from backend import platform_utils as P;print(P.primary_lan_ip() or '')" 2>/dev/null)"
-[ -n "$LANIP" ] && say "  Open from the LAN  : http://${LANIP}:${PORT}"
+if [ "$HOST" = "0.0.0.0" ] || [ "$HOST" = "::" ]; then
+  LANIP="$(python3 -c "import sys;sys.path.insert(0,'.');from backend import platform_utils as P;print(P.primary_lan_ip() or '')" 2>/dev/null)"
+  [ -n "$LANIP" ] && say "  Open from the LAN  : http://${LANIP}:${PORT} (trusted network only)"
+else
+  say "  LAN access         : disabled by default (set WD_HOST=0.0.0.0 to opt in)"
+fi
 say "  APK server field   : $FIRST_URL"
 
 if [ "$FAIL" -gt 0 ]; then
@@ -195,7 +200,7 @@ if [ "$MODE" = "--run" ] || [ "$MODE" = "--install-and-run" ]; then
   head1 "starting the console"
   say "  Press CTRL+C to stop."
   say ""
-  export WD_HOST="${WD_HOST:-0.0.0.0}"
+  export WD_HOST="$HOST"
   export WD_PORT="$PORT"
   exec python3 -m uvicorn backend.main:app --host "$WD_HOST" --port "$WD_PORT" --log-level info
 fi

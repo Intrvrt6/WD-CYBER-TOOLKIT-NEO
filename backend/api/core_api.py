@@ -12,8 +12,8 @@ from backend import (audit, authorization, capabilities, emergency_stop, orchest
                      templates_registry)
 from backend.database import (Artifact, Assessment, Authorization, Finding, ScopeEntry,
                               get_db)
-from backend.deps import (Principal, current_principal, require_role,
-                         require_stage2, require_stage2_role)
+from backend.deps import (Principal, current_principal, ensure_assessment_access,
+                         ensure_job_access, require_role, require_stage2, require_stage2_role)
 
 router = APIRouter(prefix="/api", tags=["platform"])
 
@@ -78,7 +78,7 @@ def list_scope(p: Principal = Depends(current_principal), db: OrmSession = Depen
 
 
 @router.post("/scope")
-def add_scope(body: ScopeIn, p: Principal = Depends(require_role("admin", "operator")),
+def add_scope(body: ScopeIn, p: Principal = Depends(require_stage2_role("admin", "operator")),
               db: OrmSession = Depends(get_db)):
     try:
         s = authorization.add_scope(db, body.target, body.target_type, body.description, p.username)
@@ -88,7 +88,7 @@ def add_scope(body: ScopeIn, p: Principal = Depends(require_role("admin", "opera
 
 
 @router.delete("/scope/{scope_id}")
-def deactivate_scope(scope_id: str, p: Principal = Depends(require_role("admin", "operator")),
+def deactivate_scope(scope_id: str, p: Principal = Depends(require_stage2_role("admin", "operator")),
                      db: OrmSession = Depends(get_db)):
     s = db.get(ScopeEntry, scope_id)
     if s is None:
@@ -148,7 +148,10 @@ def create_authz(body: AuthzIn,
 
 @router.get("/authorizations")
 def list_authz(p: Principal = Depends(current_principal), db: OrmSession = Depends(get_db)):
-    rows = db.execute(select(Authorization).order_by(Authorization.created_at.desc()).limit(100)).scalars().all()
+    query = select(Authorization).order_by(Authorization.created_at.desc())
+    if p.role not in {"admin", "viewer"}:
+        query = query.where(Authorization.user_id == p.user.id)
+    rows = db.execute(query.limit(100)).scalars().all()
     return {"authorizations": [{"id": a.id, "targets": a.targets, "confirmed": a.confirmed,
                                 "revoked": a.revoked,
                                 "expires_at": a.expires_at.isoformat() if a.expires_at else None,
@@ -180,7 +183,10 @@ def create_assessment(body: AssessmentIn,
 @router.get("/assessments")
 def list_assessments(p: Principal = Depends(current_principal), db: OrmSession = Depends(get_db),
                      limit: int = Query(default=50, le=200)):
-    rows = db.execute(select(Assessment).order_by(Assessment.created_at.desc()).limit(limit)).scalars().all()
+    query = select(Assessment).order_by(Assessment.created_at.desc())
+    if p.role not in {"admin", "viewer"}:
+        query = query.where(Assessment.operator == p.username)
+    rows = db.execute(query.limit(limit)).scalars().all()
     return {"assessments": [orchestrator.assessment_dict(a) for a in rows]}
 
 
@@ -190,6 +196,7 @@ def get_assessment(assessment_id: str, p: Principal = Depends(current_principal)
     a = db.get(Assessment, assessment_id)
     if a is None:
         raise HTTPException(status_code=404, detail="assessment not found")
+    ensure_assessment_access(a, p)
     arts = db.execute(select(Artifact).where(Artifact.assessment_id == assessment_id)).scalars().all()
     return {**orchestrator.assessment_dict(a),
             "findings": orchestrator.findings_for(db, assessment_id),
@@ -229,6 +236,7 @@ def run_assessment(assessment_id: str, body: RunIn,
 
 @router.get("/jobs/{job_id}")
 def get_job(job_id: str, p: Principal = Depends(current_principal), db: OrmSession = Depends(get_db)):
+    ensure_job_access(db, job_id, p)
     state = orchestrator.job_state(db, job_id)
     if state is None:
         raise HTTPException(status_code=404, detail="job not found")
@@ -238,6 +246,10 @@ def get_job(job_id: str, p: Principal = Depends(current_principal), db: OrmSessi
 @router.get("/assessments/{assessment_id}/findings")
 def get_findings(assessment_id: str, p: Principal = Depends(current_principal),
                  db: OrmSession = Depends(get_db)):
+    a = db.get(Assessment, assessment_id)
+    if a is None:
+        raise HTTPException(status_code=404, detail="assessment not found")
+    ensure_assessment_access(a, p)
     return {"findings": orchestrator.findings_for(db, assessment_id)}
 
 
@@ -283,15 +295,21 @@ def stop_activate(body: StopIn, p: Principal = Depends(current_principal),
 
 
 @router.post("/emergency-stop/clear")
-def stop_clear(p: Principal = Depends(require_stage2), db: OrmSession = Depends(get_db)):
+def stop_clear(p: Principal = Depends(require_stage2_role("admin", "operator")), db: OrmSession = Depends(get_db)):
     return emergency_stop.unlock(db, actor=p.username, reason="operator clear after re-authentication")
 
 
 # ------------------------------------------------------------------ stats --
 @router.get("/stats")
 def stats(p: Principal = Depends(current_principal), db: OrmSession = Depends(get_db)):
-    rows = db.execute(select(Assessment).order_by(Assessment.created_at.desc()).limit(200)).scalars().all()
-    findings = db.execute(select(Finding).limit(5000)).scalars().all()
+    query = select(Assessment).order_by(Assessment.created_at.desc())
+    if p.role not in {"admin", "viewer"}:
+        query = query.where(Assessment.operator == p.username)
+    rows = db.execute(query.limit(200)).scalars().all()
+    assessment_ids = [a.id for a in rows]
+    findings = (db.execute(select(Finding).where(
+        Finding.assessment_id.in_(assessment_ids)).limit(5000)).scalars().all()
+        if assessment_ids else [])
     by_sev: dict[str, int] = {}
     for f in findings:
         by_sev[f.severity] = by_sev.get(f.severity, 0) + 1

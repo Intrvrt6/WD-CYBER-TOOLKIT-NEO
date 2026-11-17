@@ -22,6 +22,16 @@ def test_health_is_public(client):
     assert "engines" in body
 
 
+def test_console_sets_browser_security_headers(client):
+    response = client.get("/")
+    assert response.status_code == 200
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert response.headers["x-frame-options"] == "DENY"
+    assert response.headers["referrer-policy"] == "no-referrer"
+    csp = response.headers["content-security-policy"]
+    assert "script-src 'self'" in csp
+    assert "frame-ancestors 'none'" in csp
+
 def test_capabilities_is_public_and_honest(client):
     r = client.get("/api/capabilities")
     assert r.status_code == 200
@@ -132,6 +142,19 @@ def test_report_generation_all_formats(client, operator):
     html = client.get(f"/api/assessments/{a['id']}/report?fmt=html&lang=en", headers=h)
     assert html.status_code == 200 and "<html" in html.text.lower()
 
+
+def test_report_save_requires_stage_two(client, operator):
+    stage1 = client.post("/api/auth/stage1", json={
+        "username": operator["username"], "password": operator["password"],
+        "shortcut": operator["shortcut"],
+    })
+    assert stage1.status_code == 200
+    h1 = {"authorization": f"Bearer {stage1.json()['token']}"}
+    blocked = client.post(
+        "/api/assessments/not-a-real-id/report/save?fmt=md&lang=en", headers=h1
+    )
+    assert blocked.status_code == 403, blocked.text
+    assert blocked.json()["detail"]["code"] == "STAGE2_REQUIRED"
 
 def test_audit_endpoints_and_chain(client, operator):
     tok = _login(client, operator)

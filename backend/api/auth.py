@@ -12,7 +12,7 @@ from backend import authentication, emergency_stop
 from backend.authentication import AuthError
 from backend.database import User, get_db
 from backend.deps import (Principal, bearer, current_principal, require_role,
-                          require_stage2)
+                          require_stage2, require_stage2_role)
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -132,7 +132,7 @@ def list_operators(p: Principal = Depends(require_role("admin")), db: OrmSession
 
 
 @router.post("/operators")
-def create_operator(body: OperatorIn, p: Principal = Depends(require_role("admin")),
+def create_operator(body: OperatorIn, p: Principal = Depends(require_stage2_role("admin")),
                     db: OrmSession = Depends(get_db)):
     from backend import audit, security
     if db.execute(select(User).where(User.username == body.username)).scalar_one_or_none():
@@ -153,7 +153,7 @@ def create_operator(body: OperatorIn, p: Principal = Depends(require_role("admin
 
 
 @router.post("/shortcuts")
-def create_shortcut(label: str = "operator", p: Principal = Depends(require_role("admin")),
+def create_shortcut(label: str = "operator", p: Principal = Depends(require_stage2_role("admin")),
                     db: OrmSession = Depends(get_db)):
     """Rotate/issue a new stage-1 WD shortcut. Returned once, stored hashed."""
     import secrets, string
@@ -170,6 +170,6 @@ def create_shortcut(label: str = "operator", p: Principal = Depends(require_role
 
 
 @router.post("/unlock")
-def unlock_after_stop(p: Principal = Depends(require_stage2), db: OrmSession = Depends(get_db)):
+def unlock_after_stop(p: Principal = Depends(require_stage2_role("admin", "operator")), db: OrmSession = Depends(get_db)):
     """Clearing an emergency stop requires a fresh stage-2 session."""
     return emergency_stop.unlock(db, actor=p.username, reason="stage-2 re-authentication")

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from urllib.parse import urlsplit
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -49,6 +50,39 @@ SAMPLES_DIR = BASE_DIR / "samples"
 DATABASE_URL = os.environ.get("WD_DATABASE_URL", f"sqlite:///{DATA_DIR / 'wd_cyber.db'}")
 INSTANCE_NAME = os.environ.get("WD_INSTANCE_NAME", "WD CYBER TOOLKIT NEO")
 APP_VERSION = "1.4.1"
+
+
+def parse_cors_origins(raw: str | None) -> list[str]:
+    """Parse an explicit CORS allowlist; same-origin is the empty-list default.
+
+    Wildcards, URL paths, credentials and non-local plaintext HTTP origins are
+    rejected. Local HTTP origins remain useful for a developer workstation.
+    """
+    origins: list[str] = []
+    for item in (raw or "").split(","):
+        origin = item.strip().rstrip("/")
+        if not origin:
+            continue
+        if origin == "*":
+            raise ValueError("WD_CORS_ORIGINS must not contain wildcard origins")
+        try:
+            parsed = urlsplit(origin)
+            _ = parsed.port  # reject malformed/out-of-range ports at startup
+        except ValueError as exc:
+            raise ValueError(f"Invalid CORS origin: {item!r}") from exc
+        if (parsed.scheme not in {"https", "http"} or not parsed.hostname
+                or parsed.username or parsed.password or parsed.path
+                or parsed.query or parsed.fragment):
+            raise ValueError(f"Invalid CORS origin: {item!r}")
+        if parsed.scheme == "http" and parsed.hostname not in {
+            "localhost", "127.0.0.1", "::1"
+        }:
+            raise ValueError("Non-local CORS origins must use HTTPS")
+        origins.append(origin)
+    return list(dict.fromkeys(origins))
+
+
+CORS_ORIGINS = parse_cors_origins(os.environ.get("WD_CORS_ORIGINS", ""))
 
 # --- session / authorization lifetime -------------------------------------
 SESSION_TTL_MINUTES = int(os.environ.get("WD_SESSION_TTL_MINUTES", "480"))
@@ -90,7 +124,7 @@ def ensure_dirs() -> None:
 
 def reload() -> None:
     """Re-read .env into this module's constants (used by `make env-reload`/tests)."""
-    global DATA_DIR, EVIDENCE_DIR, REPORT_DIR, DATABASE_URL, INSTANCE_NAME
+    global DATA_DIR, EVIDENCE_DIR, REPORT_DIR, DATABASE_URL, INSTANCE_NAME, CORS_ORIGINS
     global SESSION_TTL_MINUTES, AUTHZ_TTL_MINUTES, AUTHZ_MAX_TTL_MINUTES
     global MAX_LOGIN_FAILURES, LOCKOUT_MINUTES, RATE_LIMIT_ATTEMPTS, RATE_LIMIT_WINDOW_SECONDS
     global DEFAULT_CMD_TIMEOUT, MAX_CMD_TIMEOUT, LAB_BIND_HOST
@@ -105,6 +139,7 @@ def reload() -> None:
     REPORT_DIR = Path(os.environ.get("WD_REPORT_DIR", BASE_DIR / "reports"))
     DATABASE_URL = os.environ.get("WD_DATABASE_URL", f"sqlite:///{DATA_DIR / 'wd_cyber.db'}")
     INSTANCE_NAME = os.environ.get("WD_INSTANCE_NAME", "WD CYBER TOOLKIT NEO")
+    CORS_ORIGINS = parse_cors_origins(os.environ.get("WD_CORS_ORIGINS", ""))
     SESSION_TTL_MINUTES = int(os.environ.get("WD_SESSION_TTL_MINUTES", "480"))
     AUTHZ_TTL_MINUTES = int(os.environ.get("WD_AUTHZ_TTL_MINUTES", "60"))
     AUTHZ_MAX_TTL_MINUTES = int(os.environ.get("WD_AUTHZ_MAX_TTL_MINUTES", "720"))

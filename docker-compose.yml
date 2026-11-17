@@ -13,11 +13,13 @@ services:
     image: wd-cyber-toolkit-neo:latest
     container_name: wd-neo
     ports:
-      - "${WD_PORT:-8000}:8000"
+      - "${WD_BIND_ADDRESS:-127.0.0.1}:${WD_PORT:-8000}:8000"
     environment:
       WD_INSTANCE_NAME: WD CYBER TOOLKIT NEO
       WD_HOST: 0.0.0.0
       WD_PORT: "8000"
+      # Same-origin is default; add comma-separated HTTPS origins only when needed.
+      WD_CORS_ORIGINS: ${WD_CORS_ORIGINS:-}
       # Set these to provision the operator explicitly instead of auto-generating.
       # WD_ADMIN_USER: WD-OPERATOR-01
       # WD_ADMIN_PASSWORD: Change-Me-Strong-1
@@ -48,7 +50,7 @@ services:
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-wd_cyber}
       POSTGRES_USER: ${POSTGRES_USER:-wd}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-wd_change_me}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-}
     volumes:
       - wd_pgdata:/var/lib/postgresql/data
     healthcheck:

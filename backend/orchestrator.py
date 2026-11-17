@@ -43,7 +43,7 @@ def preflight(template: dict, targets: list[str], mode: str, params: dict) -> di
                        "detail": f"Acknowledged: {item.get('question')}",
                        "required": item.get("required", True)})
     checks.append({"id": "PF-MODE", "ok": mode in ("live", "lab"),
-                   "detail": f"Execution mode '{mode}' is {'valid' if mode in ("live","lab") else 'invalid'}."})
+                   "detail": f"Execution mode '{mode}' is {'valid' if mode in ('live', 'lab') else 'invalid'}."})
     if mode not in ("live", "lab"):
         ok = False
     checks.append({"id": "PF-PARAMS", "ok": True,

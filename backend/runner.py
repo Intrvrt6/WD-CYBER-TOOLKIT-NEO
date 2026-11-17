@@ -15,6 +15,10 @@ from dataclasses import dataclass, field
 from typing import Iterable
 
 
+MAX_STDOUT_BYTES = max(4096, int(os.environ.get("WD_MAX_STDOUT_BYTES", str(1024 * 1024))))
+MAX_STDERR_BYTES = max(4096, int(os.environ.get("WD_MAX_STDERR_BYTES", str(256 * 1024))))
+
+
 @dataclass
 class ExecResult:
     command: str
@@ -67,16 +71,71 @@ class Executor:
         return self._stop.is_set()
 
     @staticmethod
-    def _kill(p: subprocess.Popen) -> None:
+    def _signal_group(p: subprocess.Popen, sig: int) -> None:
         try:
             if os.name == "posix":
-                os.killpg(os.getpgid(p.pid), signal.SIGTERM)
-            else:
+                # start_new_session=True makes the child's PID its process-group ID.
+                # Use it directly: getpgid() fails once the group leader exits even
+                # when orphaned descendants are still alive in that process group.
+                os.killpg(p.pid, sig)
+            elif sig == signal.SIGTERM:
                 p.terminate()
-        except Exception:
-            try:
+            else:
                 p.kill()
+        except (ProcessLookupError, PermissionError, OSError):
+            try:
+                if sig == signal.SIGKILL:
+                    p.kill()
+                elif sig == signal.SIGTERM:
+                    p.terminate()
             except Exception:
+                pass
+
+    @classmethod
+    def _kill(cls, p: subprocess.Popen) -> None:
+        """Terminate the complete process group, including surviving children."""
+        if os.name == "posix":
+            # Do not return merely because the leader exited: descendants may
+            # still be alive and keep stdout/stderr pipes open.
+            cls._signal_group(p, signal.SIGTERM)
+            try:
+                p.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                pass
+            cls._signal_group(p, signal.SIGKILL)
+            try:
+                p.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                pass
+            return
+        if p.poll() is not None:
+            return
+        p.terminate()
+        try:
+            p.wait(timeout=2)
+        except subprocess.TimeoutExpired:
+            p.kill()
+            try:
+                p.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                pass
+
+    @staticmethod
+    def _drain(stream, limit: int, output: bytearray) -> None:
+        """Drain a pipe completely while retaining only its last limit bytes."""
+        try:
+            while True:
+                chunk = stream.read(65536)
+                if not chunk:
+                    break
+                output.extend(chunk)
+                overflow = len(output) - limit
+                if overflow > 0:
+                    del output[:overflow]
+        finally:
+            try:
+                stream.close()
+            except OSError:
                 pass
 
     def run(self, argv: Iterable[str] | str, timeout: int = 120, cwd: str | None = None,
@@ -98,7 +157,7 @@ class Executor:
             e.update({k: str(v) for k, v in env.items()})
         try:
             p = subprocess.Popen(
-                argv_list, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                argv_list, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=False,
                 cwd=cwd, env=e, start_new_session=True,
                 stdin=subprocess.PIPE if stdin_data is not None else subprocess.DEVNULL,
             )
@@ -106,21 +165,57 @@ class Executor:
             return ExecResult(command=printable, returncode=1, argv=argv_list, stderr=str(exc))
         with self._lock:
             self._procs[p.pid] = p
+        stdout_tail, stderr_tail = bytearray(), bytearray()
+        readers = [
+            threading.Thread(target=self._drain, args=(p.stdout, MAX_STDOUT_BYTES, stdout_tail), daemon=True),
+            threading.Thread(target=self._drain, args=(p.stderr, MAX_STDERR_BYTES, stderr_tail), daemon=True),
+        ]
+        for thread in readers:
+            thread.start()
+        writer = None
+        if stdin_data is not None:
+            def _write_stdin():
+                try:
+                    p.stdin.write(stdin_data.encode("utf-8"))
+                    p.stdin.flush()
+                except (BrokenPipeError, OSError):
+                    pass
+                finally:
+                    try:
+                        p.stdin.close()
+                    except OSError:
+                        pass
+            writer = threading.Thread(target=_write_stdin, daemon=True)
+            writer.start()
+        timed_out = False
         try:
-            out, err = p.communicate(input=stdin_data, timeout=max(1, timeout))
-            timed_out = False
-        except subprocess.TimeoutExpired:
-            self._kill(p)
             try:
-                out, err = p.communicate(timeout=5)
-            except Exception:
-                out, err = "", ""
-            timed_out = True
+                p.wait(timeout=max(1, timeout))
+            except subprocess.TimeoutExpired:
+                timed_out = True
+                self._kill(p)
+            if writer is not None:
+                writer.join(timeout=2)
+            for thread in readers:
+                thread.join(timeout=3)
+            # A child that outlives its parent can keep inherited pipes open.
+            # Treat that as a leaked process group and terminate the group.
+            if p.poll() is None or any(thread.is_alive() for thread in readers):
+                self._kill(p)
+                for thread in readers:
+                    thread.join(timeout=2)
+            returncode = p.returncode if p.returncode is not None else 124
         finally:
             with self._lock:
                 self._procs.pop(p.pid, None)
+        out = bytes(stdout_tail).decode("utf-8", errors="replace")
+        err = bytes(stderr_tail).decode("utf-8", errors="replace")
+        if len(stdout_tail) >= MAX_STDOUT_BYTES:
+            out = "[... earlier stdout truncated ...]\n" + out
+        if len(stderr_tail) >= MAX_STDERR_BYTES:
+            err = "[... earlier stderr truncated ...]\n" + err
         return ExecResult(
-            command=printable, returncode=p.returncode, stdout=out or "", stderr=err or "",
+            command=printable, returncode=returncode, stdout=out, stderr=err,
             timed_out=timed_out, duration_s=time.time() - started, argv=argv_list,
         )
 

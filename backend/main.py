@@ -30,14 +30,11 @@ async def lifespan(app: FastAPI):
     try:
         creds = authentication.bootstrap(db)
         if creds:
-            log.warning("=" * 72)
-            log.warning("WD CYBER TOOLKIT NEO - bootstrap operator created")
-            log.warning("  username : %s", creds["username"])
-            log.warning("  password : %s", creds["password"])
-            log.warning("  stage-2 PIN   : %s", creds["pin"])
-            log.warning("  WD shortcut   : %s", creds["shortcut"])
-            log.warning("  also written to %s", config.DATA_DIR / "bootstrap_credentials.txt")
-            log.warning("=" * 72)
+            # Bootstrap secrets are returned once to the provisioning flow and
+            # stored in a mode-0600 file. Never copy them into container logs,
+            # which are commonly shipped to centralized log collectors.
+            log.warning("Bootstrap operator created; retrieve one-time credentials "
+                        "from the protected bootstrap file and remove it after use.")
         stop = emergency_stop.state(db)
         if stop.get("active"):
             runner.executor.request_stop()
@@ -60,10 +57,31 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title=config.INSTANCE_NAME, version=config.APP_VERSION, lifespan=lifespan,
               docs_url="/api/docs", redoc_url=None, openapi_url="/api/openapi.json")
 
+# Same-origin is the secure default. Explicitly trust only origins supplied by
+# WD_CORS_ORIGINS (comma-separated); config rejects wildcard and unsafe origins.
 app.add_middleware(
-    CORSMiddleware, allow_origins=["*"], allow_credentials=False,
-    allow_methods=["*"], allow_headers=["*"], expose_headers=["Content-Disposition"],
+    CORSMiddleware, allow_origins=config.CORS_ORIGINS, allow_credentials=False,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
+    expose_headers=["Content-Disposition"], max_age=600,
 )
+
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    """Set browser security headers without assuming TLS termination details."""
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "no-referrer")
+    response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+    response.headers.setdefault(
+        "Content-Security-Policy",
+        "default-src 'self'; base-uri 'self'; object-src 'none'; "
+        "frame-ancestors 'none'; form-action 'self'; script-src 'self'; "
+        "style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; "
+        "font-src 'self' data:; connect-src 'self'",
+    )
+    return response
 
 app.include_router(auth_api.router)
 app.include_router(core_api.router)
@@ -138,7 +156,7 @@ if config.FRONTEND_DIR.exists():
 
 def run() -> None:
     import uvicorn
-    host = os.environ.get("WD_HOST", "0.0.0.0")
+    host = os.environ.get("WD_HOST", "127.0.0.1")
     port = int(os.environ.get("WD_PORT", "8000"))
     uvicorn.run("backend.main:app", host=host, port=port, log_level="info", workers=1)
 
