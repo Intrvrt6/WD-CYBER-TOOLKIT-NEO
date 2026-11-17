@@ -20,7 +20,6 @@ index). Anything longer is treated as a different check.
 """
 from __future__ import annotations
 
-import re
 
 # A derived id is `<declared>` + optional `-` + a short suffix that STARTS WITH A
 # LETTER (CAN-05a, CAN-06b, NET-02b, NET-05c). Requiring a leading letter is what

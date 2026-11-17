@@ -14,10 +14,8 @@ Run:  python3 scripts/termux_proof.py
 """
 from __future__ import annotations
 
-import json
 import os
 import shutil
-import subprocess
 import sys
 import tempfile
 import time
@@ -111,7 +109,7 @@ os.environ["WD_ADMIN_PIN"] = "13572468"
 os.environ["WD_SHORTCUT"] = "WD-TERMUXPROOF01"
 os.environ["WD_FORCE_PASSWORD_CHANGE"] = "0"
 
-from backend import capabilities, config, database  # noqa: E402
+from backend import config, database  # noqa: E402
 config.reload()
 config.ensure_dirs()
 database.init_db()

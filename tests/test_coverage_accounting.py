@@ -17,7 +17,6 @@ disagree.
 """
 from __future__ import annotations
 
-import pytest
 
 from backend import coverage as cov
 

@@ -70,8 +70,6 @@ def audit(module: str, mode: str, targets: list, params: dict) -> dict:
         })
     # coverage: each declared id should have produced at least one result
     produced = {r.check_id for r in results}
-    missing = [d for d in declared if d not in produced
-               and not any(p.startswith(d.split("-")[0]) for p in produced)]
     # a declared check may legitimately emit a suffixed variant (NET-02b); only
     # flag when the base id itself never appears anywhere
     really_missing = []

@@ -297,8 +297,9 @@ def interface_source() -> str:
     if shutil.which("ifconfig"):
         return "ifconfig"
     try:
-        import psutil  # noqa: F401
-        return "psutil"
+        import importlib.util
+        if importlib.util.find_spec("psutil") is not None:
+            return "psutil"
     except Exception:
         pass
     return "ioctl" if os.name == "posix" else "none"

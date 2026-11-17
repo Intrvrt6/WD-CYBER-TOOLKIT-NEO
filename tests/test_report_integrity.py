@@ -10,8 +10,6 @@ like a successful run and the report overstated coverage.
 """
 from __future__ import annotations
 
-import datetime as dt
-
 import pytest
 
 
