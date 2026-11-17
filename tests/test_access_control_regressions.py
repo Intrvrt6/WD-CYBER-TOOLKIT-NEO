@@ -281,3 +281,27 @@ def test_operator_cannot_read_another_operators_assessment(client, operator, db)
         headers=headers,
     )
     assert artax.status_code == 404, artax.text
+
+
+
+# ---------------------------------------------------- stage-1 write isolation --
+def test_stage1_cannot_mutate_scope_or_administer_operators(client, operator):
+    token = _stage1(client, operator)
+    headers = _h(token)
+
+    scope = client.post("/api/scope", json={"target": "restricted.example"}, headers=headers)
+    assert scope.status_code == 403, scope.text
+    assert scope.json()["detail"]["code"] == "STAGE2_REQUIRED"
+
+    create_user = client.post(
+        "/api/auth/operators",
+        json={"username": "WD-NOT-ALLOWED", "password": "Not-Allowed-2026",
+              "pin": "31415926", "role": "operator"},
+        headers=headers,
+    )
+    assert create_user.status_code == 403, create_user.text
+    assert create_user.json()["detail"]["code"] == "STAGE2_REQUIRED"
+
+    shortcut = client.post("/api/auth/shortcuts?label=unauthorized", headers=headers)
+    assert shortcut.status_code == 403, shortcut.text
+    assert shortcut.json()["detail"]["code"] == "STAGE2_REQUIRED"
