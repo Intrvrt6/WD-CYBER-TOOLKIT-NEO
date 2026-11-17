@@ -162,7 +162,10 @@ unauthenticated caller.
 
 - [ ] Retrieve `database/bootstrap_credentials.txt` through a trusted local channel, then delete it; never copy bootstrap secrets into logs or tickets.
 - [ ] Rotate password + PIN after first login.
-- [ ] Keep the published Docker port bound to loopback by default (`WD_BIND_ADDRESS=127.0.0.1`); change it only for a deliberate network deployment.\n- [ ] Serve remote access behind TLS (reverse proxy) — the app itself speaks plain HTTP.\n- [ ] Configure `WD_CORS_ORIGINS` as a comma-separated HTTPS origin allowlist only when a separate frontend origin is required; same-origin is the default. Wildcards and non-local HTTP origins are rejected.\n- [ ] For PostgreSQL profile, set a strong `POSTGRES_PASSWORD` in the deployment environment; there is no built-in fallback password.
+- [ ] Keep the published Docker port bound to loopback by default (`WD_BIND_ADDRESS=127.0.0.1`); change it only for a deliberate network deployment.
+- [ ] Serve remote access behind TLS (reverse proxy) — the app itself speaks plain HTTP.
+- [ ] Configure `WD_CORS_ORIGINS` as a comma-separated HTTPS origin allowlist only when a separate frontend origin is required; same-origin is the default. Wildcards and non-local HTTP origins are rejected.
+- [ ] For PostgreSQL profile, set a strong `POSTGRES_PASSWORD` in the deployment environment; there is no built-in fallback password.
 - [ ] Restrict host/network access with firewall rules; the container listens on its private interface while the host port remains loopback-bound by default.
 - [ ] Keep `evidence/` and `database/` on a backed-up volume; both are inside the audit perimeter.
 - [ ] Export the audit JSON to immutable storage after each engagement.
