@@ -35,7 +35,8 @@ Default paths used by this repo's build host:
 `/workspace/android-sdk/plat/android-34-ext12`.
 
 The script runs seven stages and fails loudly rather than emitting a broken APK. It creates a local private keystore on first use if none exists; `android/keystore/*.jks` is gitignored. Never commit or share that file.
-compile resources (`aapt2`) → link resources + manifest → `javac` → dex (`d8`) →
+
+The build pipeline then compiles resources (`aapt2`) → link resources + manifest → `javac` → dex (`d8`) →
 package → `zipalign` → sign (`apksigner`) → verify.
 
 ---
