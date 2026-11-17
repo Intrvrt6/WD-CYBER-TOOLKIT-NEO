@@ -90,17 +90,28 @@ class Executor:
 
     @classmethod
     def _kill(cls, p: subprocess.Popen) -> None:
-        """Terminate a complete process group, escalating if it ignores SIGTERM."""
+        """Terminate the complete process group, including surviving children."""
+        if os.name == "posix":
+            # Do not return merely because the leader exited: descendants may
+            # still be alive and keep stdout/stderr pipes open.
+            cls._signal_group(p, signal.SIGTERM)
+            try:
+                p.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                pass
+            cls._signal_group(p, signal.SIGKILL)
+            try:
+                p.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                pass
+            return
         if p.poll() is not None:
             return
-        cls._signal_group(p, signal.SIGTERM)
+        p.terminate()
         try:
             p.wait(timeout=2)
         except subprocess.TimeoutExpired:
-            if os.name == "posix":
-                cls._signal_group(p, signal.SIGKILL)
-            else:
-                p.kill()
+            p.kill()
             try:
                 p.wait(timeout=2)
             except subprocess.TimeoutExpired:
@@ -184,8 +195,12 @@ class Executor:
                 writer.join(timeout=2)
             for thread in readers:
                 thread.join(timeout=3)
-            if p.poll() is None:
+            # A child that outlives its parent can keep inherited pipes open.
+            # Treat that as a leaked process group and terminate the group.
+            if p.poll() is None or any(thread.is_alive() for thread in readers):
                 self._kill(p)
+                for thread in readers:
+                    thread.join(timeout=2)
             returncode = p.returncode if p.returncode is not None else 124
         finally:
             with self._lock:
