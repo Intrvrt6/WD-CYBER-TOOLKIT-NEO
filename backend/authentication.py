@@ -102,13 +102,13 @@ def bootstrap(db) -> dict[str, Any] | None:
     fd = os.open(path, flags, 0o600)
     with os.fdopen(fd, "w", encoding="utf-8") as fh:
         fh.write(
-            "WD CYBER TOOLKIT NEO - one-time bootstrap credentials\\n"
-            "Generated: " + utcnow().isoformat() + "\\n"
-            "Delete this file after storing the values securely.\\n\\n"
-            f"Operator username : {username}\\n"
-            f"Operator password : {password}\\n"
-            f"Stage-2 PIN       : {pin}\\n"
-            f"Stage-1 WD shortcut: {shortcut}\\n"
+            "WD CYBER TOOLKIT NEO - one-time bootstrap credentials\n"
+            "Generated: " + utcnow().isoformat() + "\n"
+            "Delete this file after storing the values securely.\n\n"
+            f"Operator username : {username}\n"
+            f"Operator password : {password}\n"
+            f"Stage-2 PIN       : {pin}\n"
+            f"Stage-1 WD shortcut: {shortcut}\n"
         )
     try:
         os.chmod(path, 0o600)
