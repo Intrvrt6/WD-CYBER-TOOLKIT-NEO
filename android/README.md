@@ -4,24 +4,11 @@ Native Android client for WD CYBER TOOLKIT NEO. It is a real, signed, installabl
 APK built directly with the Android SDK build tools (no Gradle, no network at build
 time) and it drives the same authenticated REST API as the web UI.
 
-```
-android/dist/wd-neo.apk          58,719 bytes   signed (v2 + v3), minSdk 24, targetSdk 34
-package                          sh.testssl.wdneo
-version                          1.0.0 (versionCode 1)
-```
-
----
-
-## Install
-
-```bash
-adb install -r android/dist/wd-neo.apk
-```
-
-On the device, open **WD NEO**, then enter the backend base URL (for example
-`http://192.168.1.10:8000`), the operator username/password, the stage-1 WD
-shortcut and the stage-2 PIN. The app normalises the URL (adds a scheme, trims a
-trailing slash) and stores only what it needs to resume the session.
+**Release artifact notice:** the previously committed APK was signed with the
+repository's exposed signing key and has been removed from the current source
+tree. Do not install or redistribute that old APK. Build a fresh APK using a
+publisher-controlled private keystore as described below. The package remains
+`sh.testssl.wdneo`; minSdk 24 and targetSdk 34.
 
 ---
 
