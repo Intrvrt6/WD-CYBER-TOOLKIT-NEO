@@ -12,8 +12,8 @@ from backend import (audit, authorization, capabilities, emergency_stop, orchest
                      templates_registry)
 from backend.database import (Artifact, Assessment, Authorization, Finding, ScopeEntry,
                               get_db)
-from backend.deps import (Principal, current_principal, require_role,
-                         require_stage2, require_stage2_role)
+from backend.deps import (Principal, current_principal, ensure_assessment_access,
+                         ensure_job_access, require_role, require_stage2, require_stage2_role)
 
 router = APIRouter(prefix="/api", tags=["platform"])
 
@@ -180,7 +180,10 @@ def create_assessment(body: AssessmentIn,
 @router.get("/assessments")
 def list_assessments(p: Principal = Depends(current_principal), db: OrmSession = Depends(get_db),
                      limit: int = Query(default=50, le=200)):
-    rows = db.execute(select(Assessment).order_by(Assessment.created_at.desc()).limit(limit)).scalars().all()
+    query = select(Assessment).order_by(Assessment.created_at.desc())
+    if p.role not in {"admin", "viewer"}:
+        query = query.where(Assessment.operator == p.username)
+    rows = db.execute(query.limit(limit)).scalars().all()
     return {"assessments": [orchestrator.assessment_dict(a) for a in rows]}
 
 
@@ -190,6 +193,7 @@ def get_assessment(assessment_id: str, p: Principal = Depends(current_principal)
     a = db.get(Assessment, assessment_id)
     if a is None:
         raise HTTPException(status_code=404, detail="assessment not found")
+    ensure_assessment_access(a, p)
     arts = db.execute(select(Artifact).where(Artifact.assessment_id == assessment_id)).scalars().all()
     return {**orchestrator.assessment_dict(a),
             "findings": orchestrator.findings_for(db, assessment_id),
@@ -229,6 +233,7 @@ def run_assessment(assessment_id: str, body: RunIn,
 
 @router.get("/jobs/{job_id}")
 def get_job(job_id: str, p: Principal = Depends(current_principal), db: OrmSession = Depends(get_db)):
+    ensure_job_access(db, job_id, p)
     state = orchestrator.job_state(db, job_id)
     if state is None:
         raise HTTPException(status_code=404, detail="job not found")
@@ -238,6 +243,10 @@ def get_job(job_id: str, p: Principal = Depends(current_principal), db: OrmSessi
 @router.get("/assessments/{assessment_id}/findings")
 def get_findings(assessment_id: str, p: Principal = Depends(current_principal),
                  db: OrmSession = Depends(get_db)):
+    a = db.get(Assessment, assessment_id)
+    if a is None:
+        raise HTTPException(status_code=404, detail="assessment not found")
+    ensure_assessment_access(a, p)
     return {"findings": orchestrator.findings_for(db, assessment_id)}
 
 
