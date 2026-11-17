@@ -150,21 +150,21 @@ unauthenticated caller.
 
 ## 11. Operational hardening checklist
 
-- [ ] Delete `database/bootstrap_credentials.txt` after storing the values.
+- [ ] Retrieve `database/bootstrap_credentials.txt` through a trusted local channel, then delete it; never copy bootstrap secrets into logs or tickets.
 - [ ] Rotate password + PIN after first login.
-- [ ] Serve behind TLS (reverse proxy) — the app itself speaks plain HTTP.
-- [ ] Restrict `WD_HOST` to a management interface where possible; do not expose the API publicly.
+- [ ] Keep the published Docker port bound to loopback by default (`WD_BIND_ADDRESS=127.0.0.1`); change it only for a deliberate network deployment.\n- [ ] Serve remote access behind TLS (reverse proxy) — the app itself speaks plain HTTP.\n- [ ] Configure `WD_CORS_ORIGINS` as a comma-separated HTTPS origin allowlist only when a separate frontend origin is required; same-origin is the default. Wildcards and non-local HTTP origins are rejected.\n- [ ] For PostgreSQL profile, set a strong `POSTGRES_PASSWORD` in the deployment environment; there is no built-in fallback password.
+- [ ] Restrict host/network access with firewall rules; the container listens on its private interface while the host port remains loopback-bound by default.
 - [ ] Keep `evidence/` and `database/` on a backed-up volume; both are inside the audit perimeter.
 - [ ] Export the audit JSON to immutable storage after each engagement.
 - [ ] Review `/api/capabilities` before an engagement and record missing tools as coverage limits.
 
-## 11. Known security limitations (honest list)
+## 12. Known security limitations (honest list)
 
 - **CORS is permissive** (`allow_origins=["*"]`) so the SPA can be served from any host in a lab.
   Tighten it for internet-facing deployments.
 - **Tokens travel in the `Authorization` header only** — no cookies, so CSRF is not applicable, but
   the client must hold the token (it uses `localStorage`).
-- **One shared rate-limit window** rather than a per-username bucket (see above).
+- **Rate-limit state is database-backed**, but deployments with multiple application processes should validate cross-process concurrency and consider a dedicated shared rate-limit backend.
 - **No MFA/TOTP** beyond the two-stage shared-secret model.
 - **Subprocess execution is by design** — the platform is a pentest driver; run it on a host you
   control, not on a shared multi-tenant box without OS-level isolation.
