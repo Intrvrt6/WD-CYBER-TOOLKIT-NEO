@@ -133,6 +133,19 @@ def test_report_generation_all_formats(client, operator):
     assert html.status_code == 200 and "<html" in html.text.lower()
 
 
+def test_report_save_requires_stage_two(client, operator):
+    stage1 = client.post("/api/auth/stage1", json={
+        "username": operator["username"], "password": operator["password"],
+        "shortcut": operator["shortcut"],
+    })
+    assert stage1.status_code == 200
+    h1 = {"authorization": f"Bearer {stage1.json()['token']}"}
+    blocked = client.post(
+        "/api/assessments/not-a-real-id/report/save?fmt=md&lang=en", headers=h1
+    )
+    assert blocked.status_code == 403, blocked.text
+    assert blocked.json()["detail"]["code"] == "STAGE2_REQUIRED"
+
 def test_audit_endpoints_and_chain(client, operator):
     tok = _login(client, operator)
     h = {"authorization": f"Bearer {tok}"}
