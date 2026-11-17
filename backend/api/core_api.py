@@ -78,7 +78,7 @@ def list_scope(p: Principal = Depends(current_principal), db: OrmSession = Depen
 
 
 @router.post("/scope")
-def add_scope(body: ScopeIn, p: Principal = Depends(require_role("admin", "operator")),
+def add_scope(body: ScopeIn, p: Principal = Depends(require_stage2_role("admin", "operator")),
               db: OrmSession = Depends(get_db)):
     try:
         s = authorization.add_scope(db, body.target, body.target_type, body.description, p.username)
@@ -88,7 +88,7 @@ def add_scope(body: ScopeIn, p: Principal = Depends(require_role("admin", "opera
 
 
 @router.delete("/scope/{scope_id}")
-def deactivate_scope(scope_id: str, p: Principal = Depends(require_role("admin", "operator")),
+def deactivate_scope(scope_id: str, p: Principal = Depends(require_stage2_role("admin", "operator")),
                      db: OrmSession = Depends(get_db)):
     s = db.get(ScopeEntry, scope_id)
     if s is None:
