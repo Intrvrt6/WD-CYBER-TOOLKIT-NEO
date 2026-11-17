@@ -49,7 +49,8 @@ def ping(p: Principal = Depends(current_principal)):
                             detail={"code": exc.code, "message": exc.message})
 
 
-def _context_for(db: OrmSession, assessment_id: str | None, scope: str,\n                 principal: Principal) -> tuple[str, str]:
+def _context_for(db: OrmSession, assessment_id: str | None, scope: str,
+                 principal: Principal) -> tuple[str, str]:
     """Build the evidence block. Returns (context, resolved_scope)."""
     if scope == "platform":
         from engines import base
@@ -101,7 +102,7 @@ def ask(body: AskIn, p: Principal = Depends(current_principal), db: OrmSession =
 
 @router.post("/stream")
 def stream(body: AskIn, p: Principal = Depends(current_principal), db: OrmSession = Depends(get_db)):
-    context, resolved = _context_for(db, body.assessment_id, body.scope)
+    context, resolved = _context_for(db, body.assessment_id, body.scope, p)
     client = get_client()
 
     def gen():
