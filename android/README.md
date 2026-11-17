@@ -12,6 +12,16 @@ publisher-controlled private keystore as described below. The package remains
 
 ---
 
+## Connect safely
+
+On the same phone as a Termux-hosted backend, use `http://127.0.0.1:8000`.
+For a remote server, use an HTTPS URL such as `https://console.example.test`;
+terminate TLS at a trusted reverse proxy. **Do not send bearer tokens over plain
+HTTP on a LAN or the public internet** — they can be intercepted. The Android
+client stores the server address and username; the bearer token remains in memory.
+
+---
+
 ## Build from source
 
 Preflight requires a JDK, `keytool`, `zip`, and an Android SDK with build-tools +
