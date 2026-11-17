@@ -66,6 +66,23 @@ app.add_middleware(
     expose_headers=["Content-Disposition"], max_age=600,
 )
 
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    """Set browser security headers without assuming TLS termination details."""
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "no-referrer")
+    response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+    response.headers.setdefault(
+        "Content-Security-Policy",
+        "default-src 'self'; base-uri 'self'; object-src 'none'; "
+        "frame-ancestors 'none'; form-action 'self'; script-src 'self'; "
+        "style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; "
+        "font-src 'self' data:; connect-src 'self'",
+    )
+    return response
+
 app.include_router(auth_api.router)
 app.include_router(core_api.router)
 app.include_router(reports_api.router)
