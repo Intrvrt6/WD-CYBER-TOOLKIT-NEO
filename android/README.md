@@ -28,13 +28,18 @@ trailing slash) and stores only what it needs to resume the session.
 ## Build from source
 
 Preflight requires a JDK, `keytool`, `zip`, and an Android SDK with build-tools +
-a platform `android.jar`. Point the script at them if they are not in the default
-locations:
+a platform `android.jar`. Release signing also requires a private keystore password
+and key password supplied through a secret manager or protected environment. The
+repository no longer contains a shared release key.
 
 ```bash
 cd android
 export ANDROID_BUILD_TOOLS=/path/to/build-tools/34.0.0
 export ANDROID_PLATFORM=/path/to/platforms/android-34
+export WD_KEYSTORE=keystore/wd-neo.jks
+export WD_KEYALIAS=wdneo
+export WD_STOREPASS='(retrieve securely)'
+export WD_KEYPASS='(retrieve securely)'
 ./build_apk.sh --clean      # -> dist/wd-neo.apk
 ```
 
@@ -42,7 +47,7 @@ Default paths used by this repo's build host:
 `/workspace/android-sdk/bt/android-14` and
 `/workspace/android-sdk/plat/android-34-ext12`.
 
-The script runs seven stages and fails loudly rather than emitting a broken APK:
+The script runs seven stages and fails loudly rather than emitting a broken APK. It creates a local private keystore on first use if none exists; `android/keystore/*.jks` is gitignored. Never commit or share that file.
 compile resources (`aapt2`) → link resources + manifest → `javac` → dex (`d8`) →
 package → `zipalign` → sign (`apksigner`) → verify.
 
