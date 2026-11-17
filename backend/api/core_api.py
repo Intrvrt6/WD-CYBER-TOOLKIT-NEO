@@ -295,7 +295,7 @@ def stop_activate(body: StopIn, p: Principal = Depends(current_principal),
 
 
 @router.post("/emergency-stop/clear")
-def stop_clear(p: Principal = Depends(require_stage2), db: OrmSession = Depends(get_db)):
+def stop_clear(p: Principal = Depends(require_stage2_role("admin", "operator")), db: OrmSession = Depends(get_db)):
     return emergency_stop.unlock(db, actor=p.username, reason="operator clear after re-authentication")
 
 
