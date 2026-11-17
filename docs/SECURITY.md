@@ -5,7 +5,7 @@
 | Stage | Proof required | Grants |
 |---|---|---|
 | 1 | WD shortcut code **and** operator password | a session that can browse scope, templates, modules, capabilities, audit |
-| 2 | separate PIN | authorizations, assessment creation, execution, report save, stop clear |
+| 2 | separate PIN | scope mutations, operator/shortcut administration, authorizations, assessment creation, execution, report save, stop clear |
 
 Design intent:
 
@@ -100,7 +100,7 @@ stop. They were previously reachable with a stage-1 session and no scope check a
 | `operator` | scope management, authorizations, assessments, reports |
 | `viewer` | read-only browsing: no scope writes, no authorizations, no assessment creation or execution |
 
-RBAC is enforced through `require_stage2_role(...)` on every execute path (authorize, create, run),
+RBAC is enforced through `require_stage2_role(...)` on privileged write paths (scope mutation, operator/shortcut administration, authorize, create, run),
 which checks the role **and** the stage-2 / rotated-password gates; read-only routes use
 `current_principal` or `require_role(...)`. There is no client-side authorization. Halt stays open to
 any authenticated operator by design.
