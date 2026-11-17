@@ -13,7 +13,7 @@ if [ -d .venv ]; then
   source .venv/bin/activate
 fi
 
-HOST="${WD_HOST:-0.0.0.0}"
+HOST="${WD_HOST:-127.0.0.1}"
 PORT="${WD_PORT:-8000}"
 export WD_HOST="$HOST" WD_PORT="$PORT"
 
@@ -46,16 +46,16 @@ PLATFORM_LABEL="$(printf '%s\n' "$PLATFORM_INFO" | sed -n 's/^platform://p' | he
 [ -n "$PLATFORM_LABEL" ] && echo " platform: ${PLATFORM_LABEL}"
 
 if printf '%s\n' "$PLATFORM_INFO" | grep -q '^url:'; then
-  FIRST=1
-  while IFS= read -r line; do
-    url="${line#url:}"
-    if [ "$FIRST" -eq 1 ]; then
-      echo " this device : ${url}  <-- open here (or point the APK at this)"
-      FIRST=0
-    else
-      echo " LAN        : ${url}  <-- other devices on the same network"
-    fi
-  done <<< "$(printf '%s\n' "$PLATFORM_INFO" | grep '^url:')"
+  FIRST_URL="$(printf '%s\n' "$PLATFORM_INFO" | sed -n 's/^url://p' | head -1)"
+  echo " this device : ${FIRST_URL}  <-- open here (or point the APK at this)"
+  if [ "$HOST" = "0.0.0.0" ] || [ "$HOST" = "::" ]; then
+    while IFS= read -r line; do
+      url="${line#url:}"
+      [ "$url" = "$FIRST_URL" ] || echo " LAN        : ${url}  <-- trusted network only"
+    done <<< "$(printf '%s\n' "$PLATFORM_INFO" | grep '^url:')"
+  else
+    echo " LAN access : disabled (set WD_HOST=0.0.0.0 only when intentionally exposing the console)"
+  fi
 else
   echo " http://${HOST}:${PORT}  (docs: /api/docs)"
 fi
@@ -69,5 +69,5 @@ case "$PLATFORM_LABEL" in
     ;;
 esac
 
-# Bootstrap secrets are printed by the app on first boot only.
+# Bootstrap secrets are written to the protected one-time file; never log them.
 exec python3 -m uvicorn backend.main:app --host "$HOST" --port "$PORT" --log-level info
