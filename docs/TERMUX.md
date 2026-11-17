@@ -24,20 +24,29 @@ bash scripts/termux.sh
 ```
 
 One command does everything: installs packages, installs the core Python set,
-initialises the database, takes a wake lock and starts the console. It prints the
-addresses to use:
+initialises the database, takes a wake lock and starts the console. By default it
+binds to loopback only:
 
 ```
 =============================================================
  WD CYBER TOOLKIT NEO
  platform: termux
- this device : http://127.0.0.1:8000  <-- open here (or point the APK at this)
- LAN        : http://192.168.1.42:8000  <-- other devices on the same network
+ this device : http://127.0.0.1:8000
+ LAN access : disabled by default
 =============================================================
 ```
 
 Then open `http://127.0.0.1:8000` **in the phone's browser** (Chrome/Firefox on the
 same device can reach the phone's own loopback).
+
+If you deliberately need access from another device on a trusted network, opt in:
+
+```bash
+WD_HOST=0.0.0.0 bash scripts/termux.sh
+```
+
+This exposes the API to the LAN. Do not send passwords or bearer tokens over plain
+HTTP on untrusted networks; put the console behind a trusted TLS reverse proxy.
 
 ### Other modes
 
