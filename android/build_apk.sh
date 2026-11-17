@@ -120,21 +120,23 @@ echo "alignment verified"
 
 # ----------------------------------------------------------------- 7. sign ---
 log "7/7 sign"
-# The signing key decides the app IDENTITY: a different key means Android
-# refuses the update (INSTALL_FAILED_UPDATE_INCOMPATIBLE). So the default
-# keystore is committed, and callers can override it with WD_KEYSTORE /
-# WD_STOREPASS / WD_KEYPASS to sign with their own.
+# The release signing identity must be supplied and controlled by the publisher.
+# Never ship a shared or repository-embedded private key.
 KEYSTORE="${WD_KEYSTORE:-keystore/wd-neo.jks}"
-STOREPASS="${WD_STOREPASS:-wdneo-release}"
-KEYPASS="${WD_KEYPASS:-$STOREPASS}"
+STOREPASS="${WD_STOREPASS:-}"
+KEYPASS="${WD_KEYPASS:-}"
 KEYALIAS="${WD_KEYALIAS:-wdneo}"
+[ -n "$STOREPASS" ] || fail "WD_STOREPASS is required; provide a private release keystore password"
+[ -n "$KEYPASS" ] || fail "WD_KEYPASS is required; provide the private key password"
+mkdir -p "$(dirname "$KEYSTORE")"
 if [ ! -f "$KEYSTORE" ]; then
-  mkdir -p "$(dirname "$KEYSTORE")"
+  log "generate local private signing key"
   keytool -genkeypair -keystore "$KEYSTORE" -alias "$KEYALIAS" \
-    -keyalg RSA -keysize 2048 -validity 10950 \
+    -keyalg RSA -keysize 3072 -validity 10950 \
     -storepass "$STOREPASS" -keypass "$KEYPASS" \
     -dname 'CN=WD Cyber Toolkit NEO, OU=Security Engineering, O=WD, L=Jakarta, C=ID'
-  echo "generated release keystore $KEYSTORE"
+  chmod 600 "$KEYSTORE"
+  echo "generated private release keystore at $KEYSTORE (keep it backed up securely)"
 fi
 echo "keystore    : $KEYSTORE (alias $KEYALIAS)"
 "$BT/apksigner" sign \
