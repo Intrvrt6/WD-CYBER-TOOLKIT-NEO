@@ -148,7 +148,10 @@ def create_authz(body: AuthzIn,
 
 @router.get("/authorizations")
 def list_authz(p: Principal = Depends(current_principal), db: OrmSession = Depends(get_db)):
-    rows = db.execute(select(Authorization).order_by(Authorization.created_at.desc()).limit(100)).scalars().all()
+    query = select(Authorization).order_by(Authorization.created_at.desc())
+    if p.role not in {"admin", "viewer"}:
+        query = query.where(Authorization.user_id == p.user.id)
+    rows = db.execute(query.limit(100)).scalars().all()
     return {"authorizations": [{"id": a.id, "targets": a.targets, "confirmed": a.confirmed,
                                 "revoked": a.revoked,
                                 "expires_at": a.expires_at.isoformat() if a.expires_at else None,
@@ -299,8 +302,14 @@ def stop_clear(p: Principal = Depends(require_stage2), db: OrmSession = Depends(
 # ------------------------------------------------------------------ stats --
 @router.get("/stats")
 def stats(p: Principal = Depends(current_principal), db: OrmSession = Depends(get_db)):
-    rows = db.execute(select(Assessment).order_by(Assessment.created_at.desc()).limit(200)).scalars().all()
-    findings = db.execute(select(Finding).limit(5000)).scalars().all()
+    query = select(Assessment).order_by(Assessment.created_at.desc())
+    if p.role not in {"admin", "viewer"}:
+        query = query.where(Assessment.operator == p.username)
+    rows = db.execute(query.limit(200)).scalars().all()
+    assessment_ids = [a.id for a in rows]
+    findings = (db.execute(select(Finding).where(
+        Finding.assessment_id.in_(assessment_ids)).limit(5000)).scalars().all()
+        if assessment_ids else [])
     by_sev: dict[str, int] = {}
     for f in findings:
         by_sev[f.severity] = by_sev.get(f.severity, 0) + 1
