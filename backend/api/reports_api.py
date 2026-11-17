@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session as OrmSession
 
 from backend import audit, config
 from backend.database import Artifact, Assessment, get_db
-from backend.deps import (Principal, current_principal, ensure_assessment_access)
+from backend.deps import (Principal, current_principal, ensure_assessment_access, require_stage2)
 from backend.reports import generator
 
 router = APIRouter(prefix="/api", tags=["reports"])
@@ -39,7 +39,7 @@ def get_report(assessment_id: str, fmt: str = Query(default="pdf", pattern="^(pd
 @router.post("/assessments/{assessment_id}/report/save")
 def save_report(assessment_id: str, fmt: str = Query(default="pdf", pattern="^(pdf|html|md)$"),
                 lang: str = Query(default="en", pattern="^(en|id)$"),
-                p: Principal = Depends(current_principal), db: OrmSession = Depends(get_db)):
+                p: Principal = Depends(require_stage2), db: OrmSession = Depends(get_db)):
     a = db.get(Assessment, assessment_id)
     if a is None:
         raise HTTPException(status_code=404, detail="assessment not found")
