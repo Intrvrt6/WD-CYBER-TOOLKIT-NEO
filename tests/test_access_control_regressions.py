@@ -305,3 +305,50 @@ def test_stage1_cannot_mutate_scope_or_administer_operators(client, operator):
     shortcut = client.post("/api/auth/shortcuts?label=unauthorized", headers=headers)
     assert shortcut.status_code == 403, shortcut.text
     assert shortcut.json()["detail"]["code"] == "STAGE2_REQUIRED"
+
+
+
+# ------------------------------------------------ viewer remains read-only --
+def test_viewer_cannot_save_reports_or_clear_emergency_stop(client, operator, db):
+    admin_token = _login(client, operator)
+    client.post("/api/scope", json={"target": "viewer.example"}, headers=_h(admin_token))
+    assessment = client.post(
+        "/api/assessments",
+        json={"template": "physical_pentest", "targets": ["viewer.example"]},
+        headers=_h(admin_token),
+    )
+    assert assessment.status_code == 200, assessment.text
+
+    created = client.post(
+        "/api/auth/operators",
+        json={"username": "WD-READ-ONLY", "password": "Read-Only-Viewer-2026",
+              "pin": "27182818", "role": "viewer"},
+        headers=_h(admin_token),
+    )
+    assert created.status_code == 200, created.text
+    db.execute(text("UPDATE users SET must_change_password=0 WHERE username='WD-READ-ONLY'"))
+    db.commit()
+    viewer = {
+        "username": "WD-READ-ONLY", "password": "Read-Only-Viewer-2026",
+        "pin": "27182818", "shortcut": operator["shortcut"],
+    }
+    viewer_token = _login(client, viewer)
+    headers = _h(viewer_token)
+
+    saved = client.post(
+        f"/api/assessments/{assessment.json()['id']}/report/save?fmt=md",
+        headers=headers,
+    )
+    assert saved.status_code == 403, saved.text
+    assert saved.json()["detail"]["code"] == "ROLE_REQUIRED"
+
+    client.post("/api/emergency-stop", json={"reason": "viewer-readonly-test"},
+                headers=_h(admin_token))
+    viewer_token = _login(client, viewer)  # stop revokes all existing sessions
+    headers = _h(viewer_token)
+    clear = client.post("/api/emergency-stop/clear", headers=headers)
+    assert clear.status_code == 403, clear.text
+    assert clear.json()["detail"]["code"] == "ROLE_REQUIRED"
+    unlock = client.post("/api/auth/unlock", headers=headers)
+    assert unlock.status_code == 403, unlock.text
+    assert unlock.json()["detail"]["code"] == "ROLE_REQUIRED"
