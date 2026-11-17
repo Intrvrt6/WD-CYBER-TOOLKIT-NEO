@@ -174,6 +174,7 @@ unauthenticated caller.
 ## 13. Known security limitations (honest list)
 
 - **CORS is same-origin by default.** Cross-origin frontends must be explicitly listed in `WD_CORS_ORIGINS`; avoid broad trusted-origin lists.
+- **Browser response headers:** the console sends a restrictive CSP, `nosniff`, frame denial, a no-referrer policy and a permissions policy. Keep third-party scripts out of the trusted frontend origin.
 - **Tokens travel in the `Authorization` header only** — no cookies, so CSRF is not applicable, but
   the client must hold the token (it uses `localStorage`).
 - **Rate-limit state is database-backed**, but deployments with multiple application processes should validate cross-process concurrency and consider a dedicated shared rate-limit backend.
