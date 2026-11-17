@@ -74,7 +74,10 @@ def _context_for(db: OrmSession, assessment_id: str | None, scope: str,
         return ctx, "assessment"
 
     # scope=auto with no id: fall back to the most recent assessment, else platform.
-    latest = db.execute(select(Assessment).order_by(Assessment.created_at.desc()).limit(1)).scalar_one_or_none()
+    latest_query = select(Assessment).order_by(Assessment.created_at.desc())
+    if principal.role not in {"admin", "viewer"}:
+        latest_query = latest_query.where(Assessment.operator == principal.username)
+    latest = db.execute(latest_query.limit(1)).scalar_one_or_none()
     if latest is not None:
         arts = db.execute(select(Artifact).where(Artifact.assessment_id == latest.id)).scalars().all()
         ctx = build_assessment_context(
