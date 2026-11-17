@@ -65,7 +65,11 @@ def parse_cors_origins(raw: str | None) -> list[str]:
             continue
         if origin == "*":
             raise ValueError("WD_CORS_ORIGINS must not contain wildcard origins")
-        parsed = urlsplit(origin)
+        try:
+            parsed = urlsplit(origin)
+            _ = parsed.port  # reject malformed/out-of-range ports at startup
+        except ValueError as exc:
+            raise ValueError(f"Invalid CORS origin: {item!r}") from exc
         if (parsed.scheme not in {"https", "http"} or not parsed.hostname
                 or parsed.username or parsed.password or parsed.path
                 or parsed.query or parsed.fragment):
