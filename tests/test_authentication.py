@@ -20,6 +20,19 @@ def test_bootstrap_is_idempotent(db, creds):
     assert db.query(User).count() == 1
 
 
+def test_bootstrap_credentials_file_is_private_and_has_line_breaks(db, creds):
+    import os
+    import stat
+    from backend import config
+
+    path = config.DATA_DIR / "bootstrap_credentials.txt"
+    assert path.exists()
+    assert stat.S_IMODE(os.stat(path).st_mode) == 0o600
+    content = path.read_text(encoding="utf-8")
+    assert "\\n" not in content
+    assert "Operator username :" in content
+    assert "Operator password :" in content
+
 def test_bootstrap_persists_only_hashes(db, creds):
     u = db.query(User).first()
     assert u.password_hash.startswith("$argon2id$")
