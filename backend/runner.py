@@ -97,7 +97,10 @@ class Executor:
         try:
             p.wait(timeout=2)
         except subprocess.TimeoutExpired:
-            cls._signal_group(p, signal.SIGKILL)
+            if os.name == "posix":
+                cls._signal_group(p, signal.SIGKILL)
+            else:
+                p.kill()
             try:
                 p.wait(timeout=2)
             except subprocess.TimeoutExpired:
