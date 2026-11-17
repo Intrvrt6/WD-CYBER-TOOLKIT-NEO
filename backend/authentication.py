@@ -93,16 +93,23 @@ def bootstrap(db) -> dict[str, Any] | None:
              "must_change_password": user.must_change_password}
     config.ensure_dirs()
     path = config.DATA_DIR / "bootstrap_credentials.txt"
-    path.write_text(
-        "WD CYBER TOOLKIT NEO - one-time bootstrap credentials\n"
-        "Generated: " + utcnow().isoformat() + "\n"
-        "Delete this file after storing the values securely.\n\n"
-        f"Operator username : {username}\n"
-        f"Operator password : {password}\n"
-        f"Stage-2 PIN       : {pin}\n"
-        f"Stage-1 WD shortcut: {shortcut}\n",
-        encoding="utf-8",
-    )
+    # Create with restrictive permissions from the first filesystem operation;
+    # chmod-after-write leaves a short window where the process umask may expose
+    # cleartext bootstrap secrets to other local users.
+    flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    fd = os.open(path, flags, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        fh.write(
+            "WD CYBER TOOLKIT NEO - one-time bootstrap credentials\\n"
+            "Generated: " + utcnow().isoformat() + "\\n"
+            "Delete this file after storing the values securely.\\n\\n"
+            f"Operator username : {username}\\n"
+            f"Operator password : {password}\\n"
+            f"Stage-2 PIN       : {pin}\\n"
+            f"Stage-1 WD shortcut: {shortcut}\\n"
+        )
     try:
         os.chmod(path, 0o600)
     except OSError:
