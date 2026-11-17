@@ -50,6 +50,10 @@ class Context:
     log: Callable[[str, str], None] = lambda level, msg: None
     progress: Callable[[int], None] = lambda pct: None
     findings: list[Result] = dataclasses.field(default_factory=list)
+    # Every file this assessment wrote, with its size and SHA-256. The
+    # orchestrator persists these as Artifact rows, so evidence integrity is
+    # recorded even when an engine ignores save_text()'s return value.
+    artifacts: list[dict] = dataclasses.field(default_factory=list)
 
     def add(self, result: Result) -> Result:
         self.findings.append(result)
@@ -60,15 +64,55 @@ class Context:
         os.makedirs(self.evidence_dir, exist_ok=True)
         return os.path.join(self.evidence_dir, name)
 
-    def save_text(self, name: str, text: str) -> dict:
+    def save_text(self, name: str, text: str, kind: str = "text/plain") -> dict:
+        """Write a text artifact and REGISTER it on this context.
+
+        Registration is the point: engines historically called save_text() for
+        its side effect and dropped the return value, so the file landed on disk
+        while no Artifact row (and no SHA-256) was ever recorded. Registering
+        here makes the evidence trail independent of caller discipline.
+        """
         p = self.path(name)
         with open(p, "w", encoding="utf-8") as fh:
             fh.write(text)
-        return artifact(p, name, "text/plain")
+        return self.register(p, name, kind)
+
+    def save_bytes(self, name: str, blob: bytes, kind: str = "file") -> dict:
+        """Write a binary artifact (pcap, xml, apk) and register it."""
+        p = self.path(name)
+        with open(p, "wb") as fh:
+            fh.write(blob)
+        return self.register(p, name, kind)
+
+    def register(self, path: str, name: str | None = None, kind: str = "file") -> dict:
+        """Record an existing file as evidence for this assessment."""
+        meta = artifact(path, name or os.path.basename(path), kind)
+        key = meta["path"]
+        if not any(a.get("path") == key for a in self.artifacts):
+            self.artifacts.append(meta)
+        return meta
 
 
 # --------------------------------------------------------------- utilities --
 def sha256_file(path: str) -> str:
+    """SHA-256 of a file's bytes.
+
+    A directory is also accepted: its digest is computed over a sorted manifest
+    of (relative path, file digest) pairs, so a rule directory still has a
+    meaningful, reproducible integrity value instead of raising.
+    """
+    if os.path.isdir(path):
+        h = hashlib.sha256()
+        for root, dirs, files in os.walk(path):
+            dirs.sort()
+            for name in sorted(files):
+                full = os.path.join(root, name)
+                rel = os.path.relpath(full, path).replace(os.sep, "/")
+                h.update(rel.encode("utf-8"))
+                h.update(b"\x00")
+                h.update(sha256_file(full).encode("ascii"))
+                h.update(b"\n")
+        return h.hexdigest()
     h = hashlib.sha256()
     with open(path, "rb") as fh:
         for chunk in iter(lambda: fh.read(65536), b""):
@@ -77,9 +121,25 @@ def sha256_file(path: str) -> str:
 
 
 def artifact(path: str, name: str, kind: str = "file") -> dict:
-    size = os.path.getsize(path) if os.path.exists(path) else 0
-    return {"name": name, "path": path, "kind": kind, "size": size,
-            "sha256": sha256_file(path) if os.path.exists(path) else ""}
+    """Describe one evidence artifact, with a computed size and SHA-256.
+
+    Directories are supported: size is the sum of the files inside, and the
+    digest covers a sorted manifest (see sha256_file).
+    """
+    if not os.path.exists(path):
+        return {"name": name, "path": path, "kind": kind, "size": 0, "sha256": ""}
+    if os.path.isdir(path):
+        total = 0
+        for root, _dirs, files in os.walk(path):
+            for f in files:
+                try:
+                    total += os.path.getsize(os.path.join(root, f))
+                except OSError:
+                    pass
+        return {"name": name, "path": path, "kind": kind or "directory",
+                "size": total, "sha256": sha256_file(path)}
+    return {"name": name, "path": path, "kind": kind,
+            "size": os.path.getsize(path), "sha256": sha256_file(path)}
 
 
 def tool_version(name: str, argv: list[str]) -> str:

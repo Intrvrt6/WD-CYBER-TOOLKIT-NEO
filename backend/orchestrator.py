@@ -178,9 +178,17 @@ def _run_job(job_id: str, assessment_id: str) -> None:
             saved.append(f)
         db.commit()
 
-        for ev in _collect_artifacts(results, evidence_dir, a.id):
+        # Two independent sources of truth are merged: everything the Context
+        # registered (save_text/save_bytes/register, which always carries a
+        # computed SHA-256), plus any artifact an engine attached directly to a
+        # Result's evidence list. Either path alone is sufficient; together they
+        # survive an engine that forgets about one of them.
+        recorded = 0
+        for ev in _collect_artifacts(results, evidence_dir, a.id, ctx):
             db.add(Artifact(**ev))
+            recorded += 1
         db.commit()
+        _log(db, job, "info", f"evidence: {recorded} artifact(s) recorded with SHA-256")
 
         worst = max((SEVERITY_ORDER.get(r.severity, 0) for r in results), default=0)
         fail_like = [r for r in results if r.status in ("fail", "error")]
@@ -294,22 +302,60 @@ def compute_risk(results: list[Result]) -> float:
     return round(min(10.0, base * (0.75 + 0.25 * breadth) + 0.5 * len([s for s in scored if s >= 8.0])), 2)
 
 
-def _collect_artifacts(results: list[Result], evidence_dir: str, assessment_id: str) -> list[dict]:
+def _collect_artifacts(results: list[Result], evidence_dir: str, assessment_id: str,
+                       ctx: Any | None = None) -> list[dict]:
+    """Build the Artifact rows for one assessment.
+
+    The context registry is the primary source (it is populated on every
+    write), and Result.evidence entries carrying a `path` are merged in as well.
+    A missing sha256 is always recomputed from the bytes on disk, so a row can
+    never claim an integrity value nobody calculated.
+    """
+    from engines.base import sha256_file
+
     seen: set[str] = set()
-    out = []
+    out: list[dict] = []
+
+    def _add(path: str, name: str | None, kind: str, size: int | None, sha: str) -> None:  # noqa: ARG001
+        if not (isinstance(path, str) and path and os.path.exists(path)) or path in seen:
+            return
+        seen.add(path)
+        if os.path.isdir(path):
+            real_size = 0
+            for root_dir, _dirs, files in os.walk(path):
+                for fname in files:
+                    try:
+                        real_size += os.path.getsize(os.path.join(root_dir, fname))
+                    except OSError:
+                        pass
+        else:
+            real_size = os.path.getsize(path)
+        digest = sha if isinstance(sha, str) and len(sha) == 64 else sha256_file(path)
+        out.append({
+            "assessment_id": assessment_id,
+            "name": name or os.path.basename(path),
+            "path": path,
+            "kind": kind or "file",
+            # The filesystem is the ground truth for size. An engine that
+            # writes size=0 (or a stale number) must not be able to make a
+            # recorded artifact disagree with the bytes actually on disk.
+            "size": real_size,
+            "sha256": digest,
+        })
+
+    # 1. everything the Context registered while writing evidence
+    for meta in (getattr(ctx, "artifacts", None) or []):
+        if isinstance(meta, dict):
+            _add(meta.get("path"), meta.get("name"), meta.get("kind", "file"),
+                 meta.get("size"), meta.get("sha256", ""))
+
+    # 2. artifacts an engine attached to a Result's evidence list
     for r in results:
         for ev in (r.evidence or []):
-            if not isinstance(ev, dict):
-                continue
-            p = ev.get("path")
-            if p and isinstance(p, str) and os.path.exists(p) and p not in seen:
-                seen.add(p)
-                out.append({
-                    "assessment_id": assessment_id, "name": ev.get("name") or os.path.basename(p),
-                    "path": p, "kind": ev.get("kind", "file"),
-                    "size": int(ev.get("size") or os.path.getsize(p)),
-                    "sha256": ev.get("sha256", ""),
-                })
+            if isinstance(ev, dict):
+                _add(ev.get("path"), ev.get("name"), ev.get("kind", "file"),
+                     ev.get("size"), ev.get("sha256", ""))
+
     return out
 
 

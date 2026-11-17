@@ -126,8 +126,9 @@ class NetworkEngine:
         ctx.add(Result(
             "NET-02", "TCP port and service inventory", "info",
             description=f"{len(services)} open port(s) across {len(candidates[:20])} host(s); intensity={intensity}.",
-            asset=",".join(candidates[:20]), source="live", evidence=[res.as_evidence()],
-            data={"services": services[:400], "open_count": len(services), "xml": artifact(xml_path, "nmap_scan.xml", "xml")}))
+            asset=",".join(candidates[:20]), source="live",
+            evidence=[res.as_evidence(), artifact(xml_path, "nmap_scan.xml", "xml")],
+            data={"services": services[:400], "open_count": len(services)}))
         if high:
             listing = ", ".join(f"{s['host']}:{s['port']}/{s.get('service','?')}" for s in high[:25])
             ctx.add(Result(
