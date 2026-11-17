@@ -170,6 +170,6 @@ def create_shortcut(label: str = "operator", p: Principal = Depends(require_stag
 
 
 @router.post("/unlock")
-def unlock_after_stop(p: Principal = Depends(require_stage2), db: OrmSession = Depends(get_db)):
+def unlock_after_stop(p: Principal = Depends(require_stage2_role("admin", "operator")), db: OrmSession = Depends(get_db)):
     """Clearing an emergency stop requires a fresh stage-2 session."""
     return emergency_stop.unlock(db, actor=p.username, reason="stage-2 re-authentication")
