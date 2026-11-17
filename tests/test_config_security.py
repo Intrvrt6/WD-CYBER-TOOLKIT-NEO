@@ -24,6 +24,8 @@ def test_https_origins_are_trimmed_and_deduplicated():
     "http://console.example.test",
     "ftp://console.example.test",
     "not-a-url",
+    "https://console.example.test:99999",
+    "https://console.example.test:notaport",
 ])
 def test_rejects_unsafe_or_invalid_origins(raw):
     with pytest.raises(ValueError):
