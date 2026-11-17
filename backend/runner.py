@@ -74,7 +74,10 @@ class Executor:
     def _signal_group(p: subprocess.Popen, sig: int) -> None:
         try:
             if os.name == "posix":
-                os.killpg(os.getpgid(p.pid), sig)
+                # start_new_session=True makes the child's PID its process-group ID.
+                # Use it directly: getpgid() fails once the group leader exits even
+                # when orphaned descendants are still alive in that process group.
+                os.killpg(p.pid, sig)
             elif sig == signal.SIGTERM:
                 p.terminate()
             else:
