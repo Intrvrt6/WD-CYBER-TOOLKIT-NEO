@@ -22,6 +22,16 @@ def test_health_is_public(client):
     assert "engines" in body
 
 
+def test_console_sets_browser_security_headers(client):
+    response = client.get("/")
+    assert response.status_code == 200
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert response.headers["x-frame-options"] == "DENY"
+    assert response.headers["referrer-policy"] == "no-referrer"
+    csp = response.headers["content-security-policy"]
+    assert "script-src 'self'" in csp
+    assert "frame-ancestors 'none'" in csp
+
 def test_capabilities_is_public_and_honest(client):
     r = client.get("/api/capabilities")
     assert r.status_code == 200
