@@ -30,14 +30,11 @@ async def lifespan(app: FastAPI):
     try:
         creds = authentication.bootstrap(db)
         if creds:
-            log.warning("=" * 72)
-            log.warning("WD CYBER TOOLKIT NEO - bootstrap operator created")
-            log.warning("  username : %s", creds["username"])
-            log.warning("  password : %s", creds["password"])
-            log.warning("  stage-2 PIN   : %s", creds["pin"])
-            log.warning("  WD shortcut   : %s", creds["shortcut"])
-            log.warning("  also written to %s", config.DATA_DIR / "bootstrap_credentials.txt")
-            log.warning("=" * 72)
+            # Bootstrap secrets are returned once to the provisioning flow and
+            # stored in a mode-0600 file. Never copy them into container logs,
+            # which are commonly shipped to centralized log collectors.
+            log.warning("Bootstrap operator created; retrieve one-time credentials "
+                        "from the protected bootstrap file and remove it after use.")
         stop = emergency_stop.state(db)
         if stop.get("active"):
             runner.executor.request_stop()
