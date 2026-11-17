@@ -37,11 +37,12 @@ chmod 600 android/keystore/wd-neo.jks
 Supply passwords through a secret manager or protected environment variables:
 
 ```bash
-export WD_KEYSTORE=android/keystore/wd-neo.jks
+cd android
+export WD_KEYSTORE=keystore/wd-neo.jks
 export WD_KEYALIAS=wdneo
 export WD_STOREPASS='(retrieve from your secret manager)'
 export WD_KEYPASS='(retrieve from your secret manager)'
-cd android && ./build_apk.sh --clean
+./build_apk.sh --clean
 ```
 
 The build script refuses to sign if `WD_STOREPASS` or `WD_KEYPASS` is missing.
