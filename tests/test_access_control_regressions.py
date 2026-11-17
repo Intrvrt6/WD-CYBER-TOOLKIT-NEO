@@ -231,3 +231,53 @@ def test_concurrent_audit_appends_keep_the_chain_valid(client, operator, db):
     dups = db.execute(text(
         "SELECT seq, COUNT(*) c FROM audit_events GROUP BY seq HAVING c > 1")).fetchall()
     assert dups == [], dups
+
+
+
+# -------------------------------------------------- assessment read isolation --
+def test_operator_cannot_read_another_operators_assessment(client, operator, db):
+    owner_token = _login(client, operator)
+    client.post("/api/scope", json={"target": "example.com"}, headers=_h(owner_token))
+    created = client.post(
+        "/api/assessments",
+        json={"template": "physical_pentest", "targets": ["example.com"]},
+        headers=_h(owner_token),
+    )
+    assert created.status_code == 200, created.text
+    assessment_id = created.json()["id"]
+
+    made = client.post(
+        "/api/auth/operators",
+        json={"username": "WD-PRIVATE-READER", "password": "Private-Reader-2026",
+              "pin": "31415926", "role": "operator"},
+        headers=_h(owner_token),
+    )
+    assert made.status_code == 200, made.text
+    db.execute(text(
+        "UPDATE users SET must_change_password=0 WHERE username='WD-PRIVATE-READER'"
+    ))
+    db.commit()
+    reader_token = _login(client, {
+        "username": "WD-PRIVATE-READER", "password": "Private-Reader-2026",
+        "pin": "31415926", "shortcut": operator["shortcut"],
+    })
+    headers = _h(reader_token)
+
+    listed = client.get("/api/assessments", headers=headers).json()["assessments"]
+    assert all(row["id"] != assessment_id for row in listed)
+    assert client.get(f"/api/assessments/{assessment_id}", headers=headers).status_code == 404
+    assert client.get(
+        f"/api/assessments/{assessment_id}/findings", headers=headers
+    ).status_code == 404
+    assert client.get(
+        f"/api/assessments/{assessment_id}/report?fmt=md", headers=headers
+    ).status_code == 404
+    assert client.post(
+        f"/api/assessments/{assessment_id}/report/save?fmt=md", headers=headers
+    ).status_code == 404
+    artax = client.post(
+        "/api/artax/ask",
+        json={"question": "Summarize this assessment", "assessment_id": assessment_id},
+        headers=headers,
+    )
+    assert artax.status_code == 404, artax.text
