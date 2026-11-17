@@ -37,3 +37,27 @@ def test_runner_marks_timed_out_process():
     )
     assert result.timed_out
     assert result.returncode != 0
+
+
+
+def test_runner_kills_orphaned_child_holding_output_pipes():
+    import os
+    import time
+
+    if os.name != "posix":
+        return
+    child = (
+        "import signal, time; "
+        "signal.signal(signal.SIGTERM, signal.SIG_IGN); "
+        "time.sleep(30)"
+    )
+    parent = (
+        "import subprocess, sys; "
+        "subprocess.Popen([sys.executable, '-c', " + repr(child) + "]); "
+        "print('child-started', flush=True)"
+    )
+    started = time.monotonic()
+    result = runner.Executor().run([sys.executable, "-c", parent], timeout=5)
+    assert result.ok
+    assert "child-started" in result.stdout
+    assert time.monotonic() - started < 12
